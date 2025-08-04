@@ -272,13 +272,14 @@ Response style:
         return sources
 
 
+
 async def main():
     """
     Main function - Free Chat Demo
     """
     try:
         logger.info("Starting Free Chat System Demo")
-        print("🚀 Free Chat System Demo")
+        print("Free Chat System Demo")
         print("=" * 50)
 
         # Initialize RAG system
@@ -297,34 +298,35 @@ async def main():
             stage="regular_chat"
         )
 
-        print(f"✅ Conversation ID: {result['conversation_id']}")
-        print(f"📚 Course ID: {result['course_id']}")
-        print(f"🎭 Stage: {result['stage']}")
-        print(f"💬 User Message: {result['user_message']}")
-        print(f"🤖 Final Answer: {result['final_answer']}")
-        print(f"📖 Sources ({len(result.get('sources', []))}):")
+        print(f"Conversation ID: {result['conversation_id']}")
+        print(f"Course ID: {result['course_id']}")
+        print(f"Stage: {result['stage']}")
+        print(f"User Message: {result['user_message']}")
+        print(f"Final Answer: {result['final_answer']}")
+        print(f"Sources ({len(result.get('sources', []))}):")
         for i, source in enumerate(result.get('sources', []), 1):
             print(f"  Source {i}:")
-            print(f"    📄 Source ID: {source.get('source_id', 'N/A')}")
-            print(f"    📚 Course ID: {source.get('course_id', 'N/A')}")
-            print(f"    📑 Chunk: {source.get('chunk_index', 'N/A')}")
-            print(f"    ⭐ Score: {source.get('relevance_score', 0):.3f}")
+            print(f"    Source ID: {source.get('source_id', 'N/A')}")
+            print(f"    Course ID: {source.get('course_id', 'N/A')}")
+            print(f"    Chunk: {source.get('chunk_index', 'N/A')}")
+            print(f"    Score: {source.get('relevance_score', 0):.3f}")
             if source.get('start_time'):
-                print(f"    ⏰ Time: {source.get('start_time', '')} - {source.get('end_time', '')}")
+                print(f"    Time: {source.get('start_time', '')} - {source.get('end_time', '')}")
             if source.get('section_title'):
-                print(f"    📋 Section: {source.get('section_title', '')}")
-            print(f"    📜 Preview: {source.get('text_preview', '')}")
+                print(f"    Section: {source.get('section_title', '')}")
+            print(f"    Preview: {source.get('text_preview', '')}")
             print()
-        print(f"⏰ Timestamp: {result['timestamp']}")
-        print(f"✅ Success: {result['success']}")
+        print(f"Timestamp: {result['timestamp']}")
+        print(f"Success: {result['success']}")
         if not result['success']:
-            print(f"❌ Error: {result.get('error', 'Unknown error')}")
+            print(f"Error: {result.get('error', 'Unknown error')}")
 
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
         logger.error(f"Error in main: {e}")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+

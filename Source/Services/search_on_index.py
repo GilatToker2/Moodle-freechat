@@ -65,11 +65,11 @@ class AdvancedUnifiedContentSearch:
             total_count = results.get_count()
             docs = list(results)
 
-            logger.info(f"📊 Total chunks in unified index: {total_count}")
-            logger.info(f"📄 Documents returned for testing: {len(docs)}")
+            logger.info(f"Total chunks in unified index: {total_count}")
+            logger.info(f"Documents returned for testing: {len(docs)}")
 
             if docs:
-                logger.info(f"✅ Unified index is active and contains data")
+                logger.info(f"Unified index is active and contains data")
 
                 # Count by content type
                 video_results = self.search_client.search("*", filter="content_type eq 'video'",
@@ -80,31 +80,31 @@ class AdvancedUnifiedContentSearch:
                                                         include_total_count=True, top=0)
                 doc_count = doc_results.get_count()
 
-                logger.info(f"🎥 Video chunks: {video_count}")
-                logger.info(f"📝 Document chunks: {doc_count}")
+                logger.info(f"Video chunks: {video_count}")
+                logger.info(f"Document chunks: {doc_count}")
 
                 # Display document examples
-                logger.info(f"\n📄 Document examples in index:")
+                logger.info(f"\nDocument examples in index:")
                 for i, doc in enumerate(docs[:10], 1):
                     content_type = doc.get('content_type', 'unknown')
-                    logger.info(f"\n📄 Document {i} ({content_type}):")
-                    logger.info(f"  🆔 ID: {doc.get('id', 'N/A')}")
-                    logger.info(f"  📄 Source ID: {doc.get('source_id', 'N/A')}")
-                    logger.info(f"  📝 Source Name: {doc.get('source_name', 'N/A')}")
-                    logger.info(f"  📑 Chunk Index: {doc.get('chunk_index', 'N/A')}")
+                    logger.info(f"\nDocument {i} ({content_type}):")
+                    logger.info(f"  ID: {doc.get('id', 'N/A')}")
+                    logger.info(f"  Source ID: {doc.get('source_id', 'N/A')}")
+                    logger.info(f"  Source Name: {doc.get('source_name', 'N/A')}")
+                    logger.info(f"  Chunk Index: {doc.get('chunk_index', 'N/A')}")
 
                     if content_type == 'video':
-                        logger.info(f"  ⏰ Start Time: {doc.get('start_time', 'N/A')}")
-                        logger.info(f"  ⏱️ Start Seconds: {doc.get('start_seconds', 'N/A')}")
+                        logger.info(f"  Start Time: {doc.get('start_time', 'N/A')}")
+                        logger.info(f"  Start Seconds: {doc.get('start_seconds', 'N/A')}")
                     elif content_type == 'document':
-                        logger.info(f"  📋 Section Title: {doc.get('section_title', 'N/A')}")
-                        logger.info(f"  📄 Document Type: {doc.get('document_type', 'N/A')}")
+                        logger.info(f"  Section Title: {doc.get('section_title', 'N/A')}")
+                        logger.info(f"  Document Type: {doc.get('document_type', 'N/A')}")
 
                     # Display text content
                     text = doc.get('text', '')
                     if text:
                         preview = text[:150] + "..." if len(text) > 150 else text
-                        logger.info(f"  📜 Content: {preview}")
+                        logger.info(f"  Content: {preview}")
                     logger.info("-" * 30)
 
                 return {
@@ -115,11 +115,11 @@ class AdvancedUnifiedContentSearch:
                     "sample_doc": docs[0] if docs else None
                 }
             else:
-                logger.info("⚠️ Index exists but is empty")
+                logger.info("Index exists but is empty")
                 return {"status": "empty", "total_chunks": 0}
 
         except Exception as e:
-            logger.info(f"❌ Error accessing index: {e}")
+            logger.info(f"Error accessing index: {e}")
             logger.error(f"Error checking index status: {e}")
             return {"status": "error", "error": str(e)}
 
@@ -168,49 +168,49 @@ class AdvancedUnifiedContentSearch:
             total_count = results.get_count()
 
             if not docs:
-                logger.info("❌ No results found")
+                logger.info("No results found")
                 return []
 
             filter_msg = self._build_filter_message(source_id, course_id)
-            logger.info(f"✅ Found {len(docs)} results out of {total_count} chunks{filter_msg}:")
+            logger.info(f"Found {len(docs)} results out of {total_count} chunks{filter_msg}:")
 
             for i, doc in enumerate(docs, 1):
                 score = doc.get('@search.score', 0)
                 content_type_doc = doc.get('content_type', 'unknown')
-                logger.info(f"\n📄 Result {i} ({content_type_doc}, score: {score:.3f}):")
-                logger.info(f"  🆔 ID: {doc.get('id', 'N/A')}")
-                logger.info(f"  📄 Source ID: {doc.get('source_id', 'N/A')}")
-                logger.info(f"  📚 Course ID: {doc.get('course_id', 'N/A')}")
-                logger.info(f"  📑 Chunk: {doc.get('chunk_index', 'N/A')}")
-                logger.info(f"  📅 Created: {doc.get('created_date', 'N/A')}")
+                logger.info(f"\nResult {i} ({content_type_doc}, score: {score:.3f}):")
+                logger.info(f"  ID: {doc.get('id', 'N/A')}")
+                logger.info(f"  Source ID: {doc.get('source_id', 'N/A')}")
+                logger.info(f"  Course ID: {doc.get('course_id', 'N/A')}")
+                logger.info(f"  Chunk: {doc.get('chunk_index', 'N/A')}")
+                logger.info(f"  Created: {doc.get('created_date', 'N/A')}")
 
                 if content_type_doc == 'video':
                     start_time = doc.get('start_time', '')
                     end_time = doc.get('end_time', '')
                     if start_time:
-                        logger.info(f"  ⏰ Time: {start_time} - {end_time}")
+                        logger.info(f"  Time: {start_time} - {end_time}")
                     keywords = doc.get('keywords', '')
                     if keywords:
-                        logger.info(f"  🔍 Keywords: {keywords}")
+                        logger.info(f"  Keywords: {keywords}")
                     topics = doc.get('topics', '')
                     if topics:
-                        logger.info(f"  🏷️ Topics: {topics}")
+                        logger.info(f"  Topics: {topics}")
                 elif content_type_doc == 'document':
                     section_title = doc.get('section_title', '')
                     if section_title:
-                        logger.info(f"  📋 Section Title: {section_title}")
+                        logger.info(f"  Section Title: {section_title}")
 
                 text = doc.get('text', '')
                 if text:
                     preview = text[:200] + "..." if len(text) > 200 else text
-                    logger.info(f"  📜 Content: {preview}")
+                    logger.info(f"  Content: {preview}")
 
                 logger.info("—" * 40)
 
             return docs
 
         except Exception as e:
-            logger.info(f"❌ Error in text search: {e}")
+            logger.info(f"Error in text search: {e}")
             logger.error(f"Error in text search: {e}")
             return []
 
@@ -222,7 +222,7 @@ class AdvancedUnifiedContentSearch:
             # Generate embedding for query
             query_vector = await self.generate_query_embedding(query)
             if not query_vector:
-                logger.info("⚠️ Cannot generate embedding, performing text search only")
+                logger.info("Cannot generate embedding, performing text search only")
                 return await self.simple_text_search(query, top_k, source_id, course_id)
 
             search_params = {
@@ -258,52 +258,52 @@ class AdvancedUnifiedContentSearch:
             total_count = results.get_count()
 
             if not docs:
-                logger.info("❌ No hybrid results found")
+                logger.info("No hybrid results found")
                 return []
 
             # Slice to requested top_k for display and return
             docs = docs[:top_k]
 
             filter_msg = self._build_filter_message(source_id, course_id)
-            logger.info(f"✅ Found {len(docs)} hybrid results out of {total_count} chunks{filter_msg}:")
+            logger.info(f"Found {len(docs)} hybrid results out of {total_count} chunks{filter_msg}:")
 
             for i, doc in enumerate(docs, 1):
                 score = doc.get('@search.score', 0)
                 content_type_doc = doc.get('content_type', 'unknown')
-                logger.info(f"\n📄 Result {i} ({content_type_doc}, combined score: {score:.3f}):")
-                logger.info(f"  🆔 ID: {doc.get('id', 'N/A')}")
-                logger.info(f"  📄 Source ID: {doc.get('source_id', 'N/A')}")
-                logger.info(f"  📚 Course ID: {doc.get('course_id', 'N/A')}")
-                logger.info(f"  📑 Chunk: {doc.get('chunk_index', 'N/A')}")
-                logger.info(f"  📅 Created: {doc.get('created_date', 'N/A')}")
+                logger.info(f"\nResult {i} ({content_type_doc}, combined score: {score:.3f}):")
+                logger.info(f"  ID: {doc.get('id', 'N/A')}")
+                logger.info(f"  Source ID: {doc.get('source_id', 'N/A')}")
+                logger.info(f"  Course ID: {doc.get('course_id', 'N/A')}")
+                logger.info(f"  Chunk: {doc.get('chunk_index', 'N/A')}")
+                logger.info(f"  Created: {doc.get('created_date', 'N/A')}")
 
                 if content_type_doc == 'video':
                     start_time = doc.get('start_time', '')
                     end_time = doc.get('end_time', '')
                     if start_time:
-                        logger.info(f"  ⏰ Time: {start_time} - {end_time}")
+                        logger.info(f"  Time: {start_time} - {end_time}")
                     keywords = doc.get('keywords', '')
                     if keywords:
-                        logger.info(f"  🔍 Keywords: {keywords}")
+                        logger.info(f"  Keywords: {keywords}")
                     topics = doc.get('topics', '')
                     if topics:
-                        logger.info(f"  🏷️ Topics: {topics}")
+                        logger.info(f"  Topics: {topics}")
                 elif content_type_doc == 'document':
                     section_title = doc.get('section_title', '')
                     if section_title:
-                        logger.info(f"  📋 Section Title: {section_title}")
+                        logger.info(f"  Section Title: {section_title}")
 
                 text = doc.get('text', '')
                 if text:
                     preview = text[:200] + "..." if len(text) > 200 else text
-                    logger.info(f"  📜 Content: {preview}")
+                    logger.info(f"  Content: {preview}")
 
                 logger.info("—" * 40)
 
             return docs
 
         except Exception as e:
-            logger.info(f"❌ Error in hybrid search: {e}")
+            logger.info(f"Error in hybrid search: {e}")
             logger.error(f"Error in hybrid search: {e}")
             return []
 
@@ -315,7 +315,7 @@ class AdvancedUnifiedContentSearch:
             # Generate embedding for query
             query_vector = await self.generate_query_embedding(query)
             if not query_vector:
-                logger.info("⚠️ Cannot generate embedding, performing text search only")
+                logger.info("Cannot generate embedding, performing text search only")
                 return await self.simple_text_search(query, top_k, source_id, course_id)
 
             # Prepare search parameters
@@ -355,49 +355,49 @@ class AdvancedUnifiedContentSearch:
             docs = list(results)
 
             if not docs:
-                logger.info("❌ No semantic results found")
+                logger.info("No semantic results found")
                 return []
 
             filter_msg = self._build_filter_message(source_id, course_id)
-            logger.info(f"✅ Found {len(docs)} semantic results{filter_msg}:")
+            logger.info(f"Found {len(docs)} semantic results{filter_msg}:")
 
             for i, doc in enumerate(docs, 1):
                 score = doc.get('@search.score', 0)
                 content_type_doc = doc.get('content_type', 'unknown')
-                logger.info(f"\n📄 Result {i} ({content_type_doc}, semantic score: {score:.3f}):")
-                logger.info(f"  🆔 ID: {doc.get('id', 'N/A')}")
-                logger.info(f"  📄 Source ID: {doc.get('source_id', 'N/A')}")
-                logger.info(f"  📚 Course ID: {doc.get('course_id', 'N/A')}")
-                logger.info(f"  📑 Chunk: {doc.get('chunk_index', 'N/A')}")
-                logger.info(f"  📅 Created: {doc.get('created_date', 'N/A')}")
+                logger.info(f"\nResult {i} ({content_type_doc}, semantic score: {score:.3f}):")
+                logger.info(f"  ID: {doc.get('id', 'N/A')}")
+                logger.info(f"  Source ID: {doc.get('source_id', 'N/A')}")
+                logger.info(f"  Course ID: {doc.get('course_id', 'N/A')}")
+                logger.info(f"  Chunk: {doc.get('chunk_index', 'N/A')}")
+                logger.info(f"  Created: {doc.get('created_date', 'N/A')}")
 
                 if content_type_doc == 'video':
                     start_time = doc.get('start_time', '')
                     end_time = doc.get('end_time', '')
                     if start_time:
-                        logger.info(f"  ⏰ Time: {start_time} - {end_time}")
+                        logger.info(f"  Time: {start_time} - {end_time}")
                     keywords = doc.get('keywords', '')
                     if keywords:
-                        logger.info(f"  🔍 Keywords: {keywords}")
+                        logger.info(f"  Keywords: {keywords}")
                     topics = doc.get('topics', '')
                     if topics:
-                        logger.info(f"  🏷️ Topics: {topics}")
+                        logger.info(f"  Topics: {topics}")
                 elif content_type_doc == 'document':
                     section_title = doc.get('section_title', '')
                     if section_title:
-                        logger.info(f"  📋 Section Title: {section_title}")
+                        logger.info(f"  Section Title: {section_title}")
 
                 text = doc.get('text', '')
                 if text:
                     preview = text[:200] + "..." if len(text) > 200 else text
-                    logger.info(f"  📜 Content: {preview}")
+                    logger.info(f"  Content: {preview}")
 
                 logger.info("—" * 40)
 
             return docs
 
         except Exception as e:
-            logger.info(f"❌ Error in advanced semantic search: {e}")
+            logger.info(f"Error in advanced semantic search: {e}")
             logger.error(f"Error in semantic search: {e}")
             # Fallback to regular hybrid search
             return await self.hybrid_search(query, top_k, source_id, course_id)
@@ -437,7 +437,7 @@ class AdvancedUnifiedContentSearch:
 
 async def run_unified_search_demo():
     """Run full demo of unified search system"""
-    logger.info("🔍 Advanced unified content search system - videos and documents")
+    logger.info("Advanced unified content search system - videos and documents")
     logger.info("=" * 80)
 
     try:
@@ -445,11 +445,11 @@ async def run_unified_search_demo():
         search_system = AdvancedUnifiedContentSearch("unified-content-chunks")
 
         # Check index status
-        logger.info("\n🔧 Checking unified index status:")
+        logger.info("\nChecking unified index status:")
         status = search_system.check_index_status()
 
         if status.get("status") != "active":
-            logger.info("❌ Index is not active or empty. Please ensure the index is created and contains data.")
+            logger.info("Index is not active or empty. Please ensure the index is created and contains data.")
             return
 
         # Example queries (keeping Hebrew as these are test queries)
@@ -459,45 +459,45 @@ async def run_unified_search_demo():
             "איך אפשר לשלול ביטוי"
         ]
 
-        logger.info(f"\n🎯 Running demo with {len(demo_queries)} queries:")
+        logger.info(f"\nRunning demo with {len(demo_queries)} queries:")
 
         for i, query in enumerate(demo_queries, 1):
             logger.info(f"\n{'=' * 80}")
-            logger.info(f"🔢 Query {i} of {len(demo_queries)}: '{query}'")
+            logger.info(f"Query {i} of {len(demo_queries)}: '{query}'")
             logger.info(f"{'=' * 80}")
 
             # 1. Search all content
-            logger.info(f"\n1️⃣ Search all content (videos + documents):")
+            logger.info(f"\n1. Search all content (videos + documents):")
             logger.info("-" * 50)
             await search_system.semantic_search(query, top_k=5)
 
             logger.info("\n" + "=" * 80)
 
             # 2. Search specific video
-            logger.info(f"\n2️⃣ Search specific video:")
+            logger.info(f"\n2. Search specific video:")
             logger.info("-" * 40)
             # Assume we have a video with this ID (you'll need to replace with real ID)
             sample_video_id = "13"
-            logger.info(f"🎯 Search in video: {sample_video_id}")
+            logger.info(f"Search in video: {sample_video_id}")
             await search_system.semantic_search(query, top_k=5, source_id=sample_video_id)
 
             logger.info("\n" + "=" * 80)
 
             # 3. Search specific course
-            logger.info(f"\n3️⃣ Search specific course:")
+            logger.info(f"\n3. Search specific course:")
             logger.info("-" * 35)
             sample_course_id = "Discrete_mathematics"
-            logger.info(f"🎯 Search in course: {sample_course_id}")
+            logger.info(f"Search in course: {sample_course_id}")
             await search_system.semantic_search(query, top_k=5, course_id=sample_course_id)
 
             # Break between queries
             if i < len(demo_queries):
-                logger.info("\n" + "🔄 Moving to next query..." + "\n")
+                logger.info("\n" + "Moving to next query..." + "\n")
 
-        logger.info(f"\n🎉 Demo completed successfully!")
+        logger.info(f"\nDemo completed successfully!")
 
     except Exception as e:
-        logger.info(f"❌ Error running demo: {e}")
+        logger.info(f"Error running demo: {e}")
         logger.error(f"Error in demo: {e}")
         traceback.print_exc()
 

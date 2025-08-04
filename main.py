@@ -1,9 +1,9 @@
 """
-🎓 Academic Content Processing API
+Academic Content Processing API
 
-📖 API Documentation: http://localhost:8080/docs
+API Documentation: http://localhost:8080/docs
 
-🔑 Required old_config.py settings:
+Required old_config.py settings:
 - STORAGE_CONNECTION_STRING
 - CONTAINER_NAME ("course")
 - AZURE_OPENAI_API_KEY
@@ -45,7 +45,7 @@ app.add_middleware(
 rag_system = RAGSystem()
 
 # ================================
-# 📋 RESPONSE MODELS
+# RESPONSE MODELS
 # ================================
 
 class ErrorResponse(BaseModel):
@@ -71,20 +71,20 @@ class FreeChatResponse(BaseModel):
 
 
 # ================================
-# 🏠 ROOT & HEALTH ENDPOINTS
+# ROOT & HEALTH ENDPOINTS
 # ================================
 
 @app.get("/", tags=["System"])
 async def root():
     """Home page - Search & Chat Service information"""
     return {
-        "message": "🔍💬 Search & Chat Service",
+        "message": "Search & Chat Service",
         "version": "1.0.0",
         "status": "Active",
         "functions": [
-            "💬 /free-chat - RAG-based conversational AI",
-            "🔍 /search - Advanced content search",
-            "📊 /index/status - Check index status"
+            "/free-chat - RAG-based conversational AI",
+            "/search - Advanced content search",
+            "/index/status - Check index status"
         ],
         "docs_url": "/docs"
     }
@@ -95,7 +95,7 @@ async def health_check():
     return {"status": "healthy", "service": "search-chat-service"}
 
 # ================================
-# 💬 FREE CHAT ENDPOINTS
+# FREE CHAT ENDPOINTS
 # ================================
 
 @app.post(
@@ -109,7 +109,7 @@ async def health_check():
 )
 async def free_chat_endpoint(request: FreeChatRequest):
     """
-    💬 Free Chat with RAG-based Responses
+    Free Chat with RAG-based Responses
 
     **Function Description:**
     Provides conversational AI responses based on course content using RAG (Retrieval-Augmented Generation).
@@ -152,7 +152,7 @@ async def free_chat_endpoint(request: FreeChatRequest):
     - **success**: Boolean indicating operation success
     """
     try:
-        logger.info(f"💬 Free chat request: {request.user_message} (course: {request.course_id})")
+        logger.info(f"Free chat request: {request.user_message} (course: {request.course_id})")
 
         # Validate required fields
         if not request.conversation_id:
@@ -176,9 +176,9 @@ async def free_chat_endpoint(request: FreeChatRequest):
 
         # Log result
         if result['success']:
-            logger.info(f"✅ Generated answer for: {request.user_message}")
+            logger.info(f"Generated answer for: {request.user_message}")
         else:
-            logger.warning(f"❌ Failed to generate answer: {result.get('error', 'Unknown error')}")
+            logger.warning(f"Failed to generate answer: {result.get('error', 'Unknown error')}")
 
         # Return cleaned response without conversation_history
         return FreeChatResponse(
@@ -195,21 +195,21 @@ async def free_chat_endpoint(request: FreeChatRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error in free chat endpoint: {e}")
+        logger.error(f"Error in free chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Free chat failed: {str(e)}")
 
 
 
 # ================================
-# 🚀 SERVER STARTUP
+# SERVER STARTUP
 # ================================
 
 if __name__ == "__main__":
 
-    logger.info("🚀 Starting FastAPI server...")
-    logger.info("📖 API documentation available at: http://localhost:8080/docs")
-    logger.info("🏠 Home page: http://localhost:8080/")
-    logger.info("⏹️ Stop server: Ctrl+C")
+    logger.info("Starting FastAPI server...")
+    logger.info("API documentation available at: http://localhost:8080/docs")
+    logger.info("Home page: http://localhost:8080/")
+    logger.info("Stop server: Ctrl+C")
 
     uvicorn.run(
         "main:app",
