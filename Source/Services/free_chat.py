@@ -18,8 +18,9 @@ Query Response Fields:
 """
 
 import logging
+import asyncio
 from typing import List, Dict, Optional
-from openai import AzureOpenAI
+from openai import AsyncAzureOpenAI
 from datetime import datetime
 
 from Source.Services.search_on_index import AdvancedUnifiedContentSearch
@@ -48,7 +49,7 @@ class RAGSystem:
         self.index_name = index_name
         self.search_system = AdvancedUnifiedContentSearch(index_name)
 
-        self.openai_client = AzureOpenAI(
+        self.openai_client = AsyncAzureOpenAI(
             api_key=AZURE_OPENAI_API_KEY,
             api_version=AZURE_OPENAI_API_VERSION,
             azure_endpoint=AZURE_OPENAI_ENDPOINT
@@ -58,7 +59,7 @@ class RAGSystem:
         logger.info(f"RAG System initialized with index: {index_name}, model: {self.chat_model}")
 
 
-    def generate_answer(
+    async def generate_answer(
             self,
             conversation_id: str,
             conversation_history: List[Dict],
@@ -100,7 +101,7 @@ class RAGSystem:
                     conversation_context += f"{role}: {content}\n"
 
             # Step 1: Search relevant chunks using semantic search
-            search_results = self.search_system.semantic_search(
+            search_results = await self.search_system.semantic_search(
                 query=user_message,
                 top_k=top_k,
                 source_id=source_id,
@@ -131,7 +132,7 @@ class RAGSystem:
             prompt = self._build_rag_prompt(user_message, context, conversation_context)
 
             # Step 4: Send to language model
-            response = self.openai_client.chat.completions.create(
+            response = await self.openai_client.chat.completions.create(
                 model=self.chat_model,
                 messages=[
                     {
@@ -271,7 +272,7 @@ Response style:
         return sources
 
 
-def main():
+async def main():
     """
     Main function - Free Chat Demo
     """
@@ -285,7 +286,7 @@ def main():
 
         # Test generate_answer function directly
         logger.info("Testing generate_answer function")
-        result = rag.generate_answer(
+        result = await rag.generate_answer(
             conversation_id="demo-123",
             conversation_history=[
                 {"role": "user", "content": "Hello", "timestamp": "2025-01-01T10:00:00"},
@@ -326,4 +327,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

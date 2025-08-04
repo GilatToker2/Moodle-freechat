@@ -165,7 +165,7 @@ async def free_chat_endpoint(request: FreeChatRequest):
             raise HTTPException(status_code=400, detail="stage is required")
 
         # Call RAG system
-        result = rag_system.generate_answer(
+        result = await rag_system.generate_answer(
             conversation_id=request.conversation_id,
             conversation_history=request.conversation_history,
             course_id=request.course_id,

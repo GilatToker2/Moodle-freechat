@@ -3,11 +3,12 @@ Advanced Unified Content Search - Advanced search system for unified content
 Supports searching in videos and documents
 """
 import logging
+import asyncio
 from typing import List, Dict
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizedQuery
-from openai import AzureOpenAI
+from openai import AsyncAzureOpenAI
 import traceback
 from Config.config import (
     SEARCH_SERVICE_NAME, SEARCH_API_KEY,
@@ -40,7 +41,7 @@ class AdvancedUnifiedContentSearch:
         )
 
         # Create OpenAI client for vector search
-        self.openai_client = AzureOpenAI(
+        self.openai_client = AsyncAzureOpenAI(
             api_key=AZURE_OPENAI_API_KEY,
             api_version=AZURE_OPENAI_API_VERSION,
             azure_endpoint=AZURE_OPENAI_ENDPOINT
@@ -122,10 +123,10 @@ class AdvancedUnifiedContentSearch:
             logger.error(f"Error checking index status: {e}")
             return {"status": "error", "error": str(e)}
 
-    def generate_query_embedding(self, query: str) -> List[float]:
+    async def generate_query_embedding(self, query: str) -> List[float]:
         """Generate embedding for search query"""
         try:
-            response = self.openai_client.embeddings.create(
+            response = await self.openai_client.embeddings.create(
                 model=AZURE_OPENAI_EMBEDDING_MODEL,
                 input=query
             )
@@ -134,8 +135,7 @@ class AdvancedUnifiedContentSearch:
             logger.error(f"Error generating query embedding: {e}")
             return []
 
-    def simple_text_search(self, query: str, top_k: int = 5, source_id: str = None, course_id: str = None) -> List[
-        Dict]:
+    async def simple_text_search(self, query: str, top_k: int = 5, source_id: str = None, course_id: str = None) -> List[Dict]:
         """Simple text search when embedding cannot be extracted"""
         logger.info("=" * 60)
 
@@ -214,16 +214,16 @@ class AdvancedUnifiedContentSearch:
             logger.error(f"Error in text search: {e}")
             return []
 
-    def hybrid_search(self, query: str, top_k: int = 5, source_id: str = None, course_id: str = None) -> List[Dict]:
+    async def hybrid_search(self, query: str, top_k: int = 5, source_id: str = None, course_id: str = None) -> List[Dict]:
         """Hybrid search - combines text and vector"""
         logger.info("=" * 60)
 
         try:
             # Generate embedding for query
-            query_vector = self.generate_query_embedding(query)
+            query_vector = await self.generate_query_embedding(query)
             if not query_vector:
                 logger.info("⚠️ Cannot generate embedding, performing text search only")
-                return self.simple_text_search(query, top_k, source_id, course_id)
+                return await self.simple_text_search(query, top_k, source_id, course_id)
 
             search_params = {
                 "search_text": query,
@@ -307,17 +307,16 @@ class AdvancedUnifiedContentSearch:
             logger.error(f"Error in hybrid search: {e}")
             return []
 
-    def semantic_search(self, query: str, top_k: int = 5, source_id: str = None, course_id: str = None) -> List[
-        Dict]:
+    async def semantic_search(self, query: str, top_k: int = 5, source_id: str = None, course_id: str = None) -> List[Dict]:
         """Advanced semantic search"""
         logger.info("=" * 60)
 
         try:
             # Generate embedding for query
-            query_vector = self.generate_query_embedding(query)
+            query_vector = await self.generate_query_embedding(query)
             if not query_vector:
                 logger.info("⚠️ Cannot generate embedding, performing text search only")
-                return self.simple_text_search(query, top_k, source_id, course_id)
+                return await self.simple_text_search(query, top_k, source_id, course_id)
 
             # Prepare search parameters
             search_params = {
@@ -401,10 +400,9 @@ class AdvancedUnifiedContentSearch:
             logger.info(f"❌ Error in advanced semantic search: {e}")
             logger.error(f"Error in semantic search: {e}")
             # Fallback to regular hybrid search
-            return self.hybrid_search(query, top_k, source_id, course_id)
+            return await self.hybrid_search(query, top_k, source_id, course_id)
 
-    def search_best_answers(self, query: str, k: int = 5, source_id: str = None, course_id: str = None) -> List[
-        Dict]:
+    async def search_best_answers(self, query: str, k: int = 5, source_id: str = None, course_id: str = None) -> List[Dict]:
         """
         Simple function that receives a question and returns K best answers
         Uses semantic search as default, with fallback to hybrid
@@ -418,11 +416,11 @@ class AdvancedUnifiedContentSearch:
         """
         try:
             # Use semantic search which is the smartest
-            results = self.semantic_search(query, k, source_id, course_id)
+            results = await self.semantic_search(query, k, source_id, course_id)
             return results
         except Exception:
             # fallback to hybrid if semantic fails
-            results = self.hybrid_search(query, k, source_id, course_id)
+            results = await self.hybrid_search(query, k, source_id, course_id)
             return results
 
     def _build_filter_message(self, source_id: str = None, course_id: str = None) -> str:
@@ -437,7 +435,7 @@ class AdvancedUnifiedContentSearch:
             return f" (מסונן ל-{', '.join(filter_parts)})"
         return ""
 
-def run_unified_search_demo():
+async def run_unified_search_demo():
     """Run full demo of unified search system"""
     logger.info("🔍 Advanced unified content search system - videos and documents")
     logger.info("=" * 80)
@@ -471,7 +469,7 @@ def run_unified_search_demo():
             # 1. Search all content
             logger.info(f"\n1️⃣ Search all content (videos + documents):")
             logger.info("-" * 50)
-            search_system.semantic_search(query, top_k=5)
+            await search_system.semantic_search(query, top_k=5)
 
             logger.info("\n" + "=" * 80)
 
@@ -481,7 +479,7 @@ def run_unified_search_demo():
             # Assume we have a video with this ID (you'll need to replace with real ID)
             sample_video_id = "13"
             logger.info(f"🎯 Search in video: {sample_video_id}")
-            search_system.semantic_search(query, top_k=5, source_id=sample_video_id)
+            await search_system.semantic_search(query, top_k=5, source_id=sample_video_id)
 
             logger.info("\n" + "=" * 80)
 
@@ -490,7 +488,7 @@ def run_unified_search_demo():
             logger.info("-" * 35)
             sample_course_id = "Discrete_mathematics"
             logger.info(f"🎯 Search in course: {sample_course_id}")
-            search_system.semantic_search(query, top_k=5, course_id=sample_course_id)
+            await search_system.semantic_search(query, top_k=5, course_id=sample_course_id)
 
             # Break between queries
             if i < len(demo_queries):
@@ -504,14 +502,14 @@ def run_unified_search_demo():
         traceback.print_exc()
 
 
-# def main():
-#     """Main function - run search demo"""
-#     try:
-#         run_unified_search_demo()
-#     except Exception as e:
-#         logger.error(f"Error in main: {e}")
-#         traceback.print_exc()
-#
-#
-# if __name__ == "__main__":
-#     main()
+async def main():
+    """Main function - run search demo"""
+    try:
+        await run_unified_search_demo()
+    except Exception as e:
+        logger.error(f"Error in main: {e}")
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
