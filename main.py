@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import uvicorn
+from contextlib import asynccontextmanager
 from Config.logging_config import setup_logging
 from Source.Services.free_chat import RAGSystem
 
@@ -29,8 +30,78 @@ def debug_log(message):
     logger.debug(message)
 
 
-# Initialize FastAPI app
-app = FastAPI(title="Chat Service API", version="1.0.0")
+# Global variable to hold RAG system
+rag_system = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan Context Manager - Application lifecycle management
+
+    This function manages the application startup and shutdown process:
+    - Startup: Initialize connections and services
+    - Shutdown: Close connections gracefully
+
+    Managed connections:
+    - Azure OpenAI clients (AsyncAzureOpenAI)
+    - Azure Search clients (SearchClient)
+    - Background tasks and async workers
+    """
+    global rag_system
+
+    # STARTUP - Application initialization
+    logger.info("App is starting...")
+    logger.info("Initializing connections...")
+
+    try:
+        # Initialize RAG system with all its connections
+        rag_system = RAGSystem()
+        logger.info("RAG System initialized successfully")
+        logger.info("Azure OpenAI client connected")
+        logger.info("Azure Search client connected")
+
+    except Exception as e:
+        logger.error(f"Failed to initialize services: {e}")
+        raise
+
+    # Application runs here...
+    yield
+
+    # SHUTDOWN - Application cleanup
+    logger.info("App is shutting down...")
+    logger.info("Closing connections gracefully...")
+
+    try:
+        if rag_system:
+            # Close Azure OpenAI client
+            if hasattr(rag_system, 'openai_client') and rag_system.openai_client:
+                await rag_system.openai_client.close()
+                logger.info("Azure OpenAI client closed")
+
+            # Close Azure Search client (if it has async close method)
+            if hasattr(rag_system, 'search_system') and rag_system.search_system:
+                search_client = getattr(rag_system.search_system, 'search_client', None)
+                if search_client and hasattr(search_client, 'close'):
+                    search_client.close()
+                    logger.info("Azure Search client closed")
+
+                # Close OpenAI client in search system
+                if hasattr(rag_system.search_system, 'openai_client') and rag_system.search_system.openai_client:
+                    await rag_system.search_system.openai_client.close()
+                    logger.info("Search system OpenAI client closed")
+
+        logger.info("All connections closed successfully")
+
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
+
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(
+    title="Chat Service API",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -40,9 +111,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize services
-rag_system = RAGSystem()
 
 # ================================
 # RESPONSE MODELS
