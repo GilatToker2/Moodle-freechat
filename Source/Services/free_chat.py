@@ -227,20 +227,21 @@ Answer:"""
         """
         return """You are an expert AI assistant that answers questions based on provided information.
 
-Your role:
-- Answer in Hebrew accurately and helpfully
-- Base answers only on the information provided in the context and do not invent information that doesn't exist in the sources
-- Organize answers clearly and understandably
-- Mention if information is insufficient for a complete answer
+        Your role:
+        - Answer in Hebrew accurately and helpfully
+        - Base answers only on the information provided in the context and do not invent information that doesn't exist in the sources
+        - Organize answers clearly and understandably
+        - Mention if information is insufficient for a complete answer
+        - This is a dedicated model to help students learn the material. If asked about something unrelated, respond that this is not its role.
 
-Response style:
-- Respond like an encouraging and interactive chatbot, not just a static answer
-- Use a friendly and pedagogical tone to support learning and exploration
-
-- Clear and professional
-- Structured and organized
-- Suitable for students and learners
-- Include examples when relevant"""
+        Response style:
+        - Respond like an encouraging and interactive chatbot, not just a static answer
+        - Use a friendly and pedagogical tone to support learning and exploration
+        - Clear and professional
+        - Structured and organized
+        - Suitable for students and learners
+        - Include examples when relevant
+        """
 
     def _extract_sources_info(self, chunks: List[Dict]) -> List[Dict]:
         """
@@ -294,7 +295,7 @@ async def main():
                 {"role": "assistant", "content": "Hi there!", "timestamp": "2025-01-01T10:00:01"}
             ],
             course_id="Discrete_mathematics",
-            user_message="מה זה טבלת אמת ואי ניתן לבנות אותה?",
+            user_message="אני רוצה להזמין חופשה ",
             stage="regular_chat"
         )
 
