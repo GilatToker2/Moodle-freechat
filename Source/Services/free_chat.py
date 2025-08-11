@@ -68,7 +68,6 @@ class RAGSystem:
             stage: str,
             source_id: str = None,
             top_k: int = 5,
-            max_tokens: int = 10000,
             temperature: float = 0.3
     ) -> Dict:
         """
@@ -82,7 +81,6 @@ class RAGSystem:
             stage: user stage (regular_chat/quiz_mode/presentation_discussion)
             source_id: optional source filter
             top_k: Number of chunks to retrieve from search
-            max_tokens: Maximum tokens for response
             temperature: Creativity level (0-1)
 
         Returns:
@@ -90,15 +88,6 @@ class RAGSystem:
         """
         try:
             logger.debug(f"Processing RAG query: {user_message}")
-
-            # Build context from conversation history
-            conversation_context = ""
-            if conversation_history:
-                conversation_context = "\nPrevious conversation:\n"
-                for msg in conversation_history[-5:]:  # Last 5 messages for context
-                    role = msg.get('role', 'unknown')
-                    content = msg.get('content', '')
-                    conversation_context += f"{role}: {content}\n"
 
             # Step 1: Search relevant chunks using semantic search
             search_results = await self.search_system.semantic_search(
@@ -128,23 +117,20 @@ class RAGSystem:
             # Step 2: Build context from chunks
             context = self._build_context_from_chunks(search_results)
 
-            # Step 3: Build prompt with conversation context
-            prompt = self._build_rag_prompt(user_message, context, conversation_context)
+            # Step 3: Build messages array with conversation history and current query
+            messages = self._build_conversation_messages(conversation_history, user_message, context)
+
+            # Log the final prompt for debugging
+            logger.info("=== Final prompt being sent to model ===")
+            for i, message in enumerate(messages):
+                logger.info(f"Message {i+1} - Role: {message['role']}")
+                logger.info(f"Content:\n{message['content']}")
+                logger.info("=" * 50)
 
             # Step 4: Send to language model
             response = await self.openai_client.chat.completions.create(
                 model=self.chat_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": self._get_system_prompt()
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                max_tokens=max_tokens,
+                messages=messages,
                 temperature=temperature
             )
 
@@ -197,41 +183,59 @@ class RAGSystem:
 
         return "\n\n".join(context_parts)
 
-    def _build_rag_prompt(self, query: str, context: str, conversation_context: str = "") -> str:
+    def _build_conversation_messages(self, conversation_history: List[Dict], user_message: str, context: str) -> List[Dict]:
         """
-        Build structured prompt for language model including conversation history
+        Build messages array with proper conversation structure including system prompt,
+        conversation history, and current query with context
         """
-        prompt = f"""Based on the following information, please answer the question accurately and in detail:
+        messages = []
 
-{conversation_context}
+        # Add system message
+        messages.append({
+            "role": "system",
+            "content": self._get_system_prompt()
+        })
 
-Relevant context from knowledge base:
-{context}
+        # Add conversation history (last 10 messages to avoid token limit)
+        if conversation_history:
+            for msg in conversation_history[-10:]:
+                role = msg.get('role', 'user')
+                content = msg.get('content', '')
 
-Current question: {query}
+                # Ensure role is valid (assistant or user)
+                if role not in ['assistant', 'user']:
+                    role = 'user'
 
-Guidelines for response:
-1. Answer in Hebrew clearly and understandably
-2. Base your answer only on the information provided in the context
-3. Consider the conversation history for context
-4. If the information is not sufficient for a complete answer, mention this
-5. Organize the answer logically and clearly
+                messages.append({
+                    "role": role,
+                    "content": content
+                })
 
-Answer:"""
+        # Add current user message with context
+        user_message_with_context = f"""User query: {user_message}
 
-        return prompt
+        Relevant context:
+        {context}"""
+
+        messages.append({
+            "role": "user",
+            "content": user_message_with_context
+        })
+
+        return messages
 
     def _get_system_prompt(self) -> str:
         """
         Define system behavior
         """
-        return """You are an expert AI assistant that answers questions based on provided information.
+        return """You are an expert Hebrew-speaking tutoring assistant that operates inside a RAG pipeline.
 
         Your role:
         - Answer in Hebrew accurately and helpfully
-        - Base answers only on the information provided in the context and do not invent information that doesn't exist in the sources
-        - Organize answers clearly and understandably
-        - Mention if information is insufficient for a complete answer
+        - Base your answer only on the information provided in the context
+        - Consider the conversation history for context
+        - If the information is not sufficient for a complete answer, mention this
+        - Organize the answer logically and clearly
         - This is a dedicated model to help students learn the material. If asked about something unrelated, respond that this is not its role.
 
         Response style:
@@ -241,7 +245,13 @@ Answer:"""
         - Structured and organized
         - Suitable for students and learners
         - Include examples when relevant
+        
+        Guidelines for using the context:
+        1. Answer based on the information provided in the context above
+        2. Consider the conversation history for better understanding
+        3. If the context doesn't contain sufficient information for a complete answer, mention this
         """
+
 
     def _extract_sources_info(self, chunks: List[Dict]) -> List[Dict]:
         """
@@ -330,4 +340,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
