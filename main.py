@@ -19,10 +19,11 @@ import uvicorn
 from contextlib import asynccontextmanager
 from Config.logging_config import setup_logging
 from Source.Services.free_chat import RAGSystem
-
+from Source.Services.test_myself import AssistantHelper
 
 # Initialize logger
 logger = setup_logging()
+
 
 # Convenience function for backward compatibility
 def debug_log(message):
@@ -30,8 +31,10 @@ def debug_log(message):
     logger.debug(message)
 
 
-# Global variable to hold RAG system
+# Global variables to hold systems
 rag_system = None
+assistant_helper = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,7 +50,7 @@ async def lifespan(app: FastAPI):
     - Azure Search clients (SearchClient)
     - Background tasks and async workers
     """
-    global rag_system
+    global rag_system, assistant_helper
 
     # STARTUP - Application initialization
     logger.info("App is starting...")
@@ -57,6 +60,11 @@ async def lifespan(app: FastAPI):
         # Initialize RAG system with all its connections
         rag_system = RAGSystem()
         logger.info("RAG System initialized successfully")
+
+        # Initialize Assistant Helper
+        assistant_helper = AssistantHelper()
+        logger.info("Assistant Helper initialized successfully")
+
         logger.info("Azure OpenAI client connected")
         logger.info("Azure Search client connected")
 
@@ -112,12 +120,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ================================
 # RESPONSE MODELS
 # ================================
 
 class ErrorResponse(BaseModel):
     detail: str
+
 
 class FreeChatRequest(BaseModel):
     conversation_id: str
@@ -126,6 +136,7 @@ class FreeChatRequest(BaseModel):
     user_message: str
     stage: str
     source_id: Optional[str] = None
+
 
 class FreeChatResponse(BaseModel):
     conversation_id: str
@@ -136,6 +147,25 @@ class FreeChatResponse(BaseModel):
     sources: List[Dict[str, Any]]
     timestamp: str
     success: bool
+
+
+class AssistantRequest(BaseModel):
+    conversation_id: str
+    conversation_history: List[Dict[str, Any]]
+    mode: str  # "lecture" or "full_course"
+    identifier: str  # course_id or source_id
+    query: str  # user question
+
+
+class AssistantResponse(BaseModel):
+    conversation_id: str
+    mode: str
+    identifier: str
+    query: str
+    response: str
+    sources: List[Dict[str, Any]]
+    success: bool
+    timestamp: str
 
 
 # ================================
@@ -151,16 +181,19 @@ async def root():
         "status": "Active",
         "functions": [
             "/free-chat - RAG-based conversational AI",
+            "/test_myself - AI tutor for self-assessment and guided learning",
             "/search - Advanced content search",
             "/index/status - Check index status"
         ],
         "docs_url": "/docs"
     }
 
+
 @app.get("/health", tags=["System"])
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "search-chat-service"}
+
 
 # ================================
 # FREE CHAT ENDPOINTS
@@ -267,13 +300,123 @@ async def free_chat_endpoint(request: FreeChatRequest):
         raise HTTPException(status_code=500, detail=f"Free chat failed: {str(e)}")
 
 
+# ================================
+# ASSISTANT HELPER ENDPOINTS
+# ================================
+
+@app.post(
+    "/test_myself",
+    response_model=AssistantResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid request data"},
+        500: {"model": ErrorResponse, "description": "Test myself failed"}
+    },
+    tags=["Test Myself"]
+)
+async def test_myself_endpoint(request: AssistantRequest):
+    """
+    Test Myself - AI Tutor for Self-Assessment and Learning
+
+    **Function Description:**
+    A specialized chatbot designed to help students learn through self-testing and guided discovery.
+    Instead of providing direct answers, it generates strategic questions that lead students to understand concepts deeply.
+
+    **What to Expect:**
+    • Generates targeted questions to test student understanding
+    • Creates step-by-step learning paths through questioning
+    • Helps students discover knowledge gaps and fill them
+    • Provides hints and guidance without giving away answers
+    • Encourages active learning and critical thinking
+    • Based only on indexed course content
+    • Supports both lecture-specific and full-course learning
+
+    **Request Body Example:**
+    ```json
+    {
+        "conversation_id": "demo-123",
+        "conversation_history": [
+            {"role": "user", "content": "היי"},
+            {"role": "assistant", "content": "שלום, איך אוכל לעזור לך היום?"}
+        ],
+        "mode": "lecture",
+        "identifier": "13",
+        "query": "אני רוצה ללמוד מה זה יחס שקילות?"
+    }
+    ```
+
+    **Parameters:**
+    - **conversation_id**: Unique identifier for the conversation session
+    - **conversation_history**: List of previous messages in the conversation for context
+        - Each message contains: role ("user"/"assistant"), content (message text)
+    - **mode**: "lecture" (specific file/source) or "full_course" (entire course)
+    - **identifier**: source_id (for lecture mode) or course_id (for full_course mode)
+    - **query**: Student's current question or request for help
+
+    **Returns:**
+    - **mode**: The assistance mode used
+    - **identifier**: The identifier used for search
+    - **query**: The original student query
+    - **response**: Educational AI response with guiding questions and hints
+    - **sources**: Information about content sources used
+    - **success**: Boolean indicating operation success
+    - **timestamp**: Response generation time
+    """
+    try:
+        logger.info(f"Assistant help request: {request.query} (mode: {request.mode}, id: {request.identifier})")
+
+        # Validate required fields
+        if not request.conversation_id:
+            raise HTTPException(status_code=400, detail="conversation_id is required")
+        if not request.mode:
+            raise HTTPException(status_code=400, detail="mode is required")
+        if not request.identifier:
+            raise HTTPException(status_code=400, detail="identifier is required")
+        if not request.query:
+            raise HTTPException(status_code=400, detail="query is required")
+
+        # Validate mode
+        if request.mode not in ["lecture", "full_course"]:
+            raise HTTPException(status_code=400, detail="mode must be 'lecture' or 'full_course'")
+
+        # Call Assistant Helper
+        result = await assistant_helper.get_help(
+            conversation_id=request.conversation_id,
+            conversation_history=request.conversation_history,
+            mode=request.mode,
+            identifier=request.identifier,
+            query=request.query
+        )
+
+        # Log result
+        if result['success']:
+            logger.info(f"Generated assistant help for: {request.query}")
+        else:
+            logger.warning(f"Failed to generate assistant help: {result.get('error', 'Unknown error')}")
+
+        # Return response
+        return AssistantResponse(
+            conversation_id=result['conversation_id'],
+            mode=result['mode'],
+            identifier=result['identifier'],
+            query=result['query'],
+            response=result['response'],
+            sources=result['sources'],
+            success=result['success'],
+            timestamp=result['timestamp']
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in assistant help endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Assistant help failed: {str(e)}")
+
 
 # ================================
 # SERVER STARTUP
 # ================================
 
 if __name__ == "__main__":
-
     logger.info("Starting FastAPI server...")
     logger.info("API documentation available at: http://localhost:8080/docs")
     logger.info("Home page: http://localhost:8080/")
@@ -286,4 +429,3 @@ if __name__ == "__main__":
         log_level="info",
         reload=True
     )
-
