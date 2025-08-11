@@ -58,7 +58,6 @@ class RAGSystem:
         self.chat_model = AZURE_OPENAI_CHAT_COMPLETION_MODEL
         logger.info(f"RAG System initialized with index: {index_name}, model: {self.chat_model}")
 
-
     async def generate_answer(
             self,
             conversation_id: str,
@@ -140,10 +139,32 @@ class RAGSystem:
             # Step 5: Process sources - always return sources
             sources = self._extract_sources_info(search_results)
 
-            # Return complete structure with all required fields
+            # Step 6: Build updated conversation history including the new exchange
+            updated_conversation_history = conversation_history.copy() if conversation_history else []
+
+            # Add the current user message WITH context (as it was sent to the model)
+            user_message_with_context = f"""User query: {user_message}
+
+Relevant context:
+{context}"""
+
+            updated_conversation_history.append({
+                "role": "user",
+                "content": user_message_with_context,
+                "timestamp": datetime.now().isoformat()
+            })
+
+            # Add the assistant response to history
+            updated_conversation_history.append({
+                "role": "assistant",
+                "content": final_answer,
+                "timestamp": datetime.now().isoformat()
+            })
+
+            # Return complete structure with updated conversation history
             return {
                 "conversation_id": conversation_id,
-                "conversation_history": conversation_history,
+                "conversation_history": updated_conversation_history,
                 "course_id": course_id,
                 "user_message": user_message,
                 "stage": stage,
@@ -183,7 +204,8 @@ class RAGSystem:
 
         return "\n\n".join(context_parts)
 
-    def _build_conversation_messages(self, conversation_history: List[Dict], user_message: str, context: str) -> List[Dict]:
+    def _build_conversation_messages(self, conversation_history: List[Dict], user_message: str, context: str) -> List[
+        Dict]:
         """
         Build messages array with proper conversation structure including system prompt,
         conversation history, and current query with context
@@ -196,9 +218,9 @@ class RAGSystem:
             "content": self._get_system_prompt()
         })
 
-        # Add conversation history (last 10 messages to avoid token limit)
+        # Add conversation history (all messages)
         if conversation_history:
-            for msg in conversation_history[-10:]:
+            for msg in conversation_history:
                 role = msg.get('role', 'user')
                 content = msg.get('content', '')
 
@@ -245,13 +267,12 @@ class RAGSystem:
         - Structured and organized
         - Suitable for students and learners
         - Include examples when relevant
-        
+
         Guidelines for using the context:
         1. Answer based on the information provided in the context above
         2. Consider the conversation history for better understanding
         3. If the context doesn't contain sufficient information for a complete answer, mention this
         """
-
 
     def _extract_sources_info(self, chunks: List[Dict]) -> List[Dict]:
         """
@@ -267,7 +288,7 @@ class RAGSystem:
                 "course_id": chunk.get('course_id', ''),
                 "chunk_index": chunk.get('chunk_index', 0),
                 "relevance_score": chunk.get('@search.score', 0),
-                "text_preview": chunk.get('text', '')[:150] + "..." if len(chunk.get('text', '')) > 150 else chunk.get('text', '')
+                "text_preview": chunk.get('text', '')
             }
 
             # Add any additional fields that exist (don't filter by content_type)
@@ -281,7 +302,6 @@ class RAGSystem:
             sources.append(source_info)
 
         return sources
-
 
 
 async def main():
@@ -305,7 +325,7 @@ async def main():
                 {"role": "assistant", "content": "Hi there!", "timestamp": "2025-01-01T10:00:01"}
             ],
             course_id="Discrete_mathematics",
-            user_message="אני רוצה להזמין חופשה ",
+            user_message="מה זה טבלת אמת ",
             stage="regular_chat"
         )
 
@@ -314,6 +334,15 @@ async def main():
         print(f"Stage: {result['stage']}")
         print(f"User Message: {result['user_message']}")
         print(f"Final Answer: {result['final_answer']}")
+
+        print(f"\nUpdated Conversation History ({len(result.get('conversation_history', []))}) messages:")
+        for i, msg in enumerate(result.get('conversation_history', []), 1):
+            print(f"  Message {i} - Role: {msg.get('role', 'unknown')}")
+            print(f"    Timestamp: {msg.get('timestamp', 'N/A')}")
+            content = msg.get('content', '')
+            print(f"    Content: {content}")
+            print()
+
         print(f"Sources ({len(result.get('sources', []))}):")
         for i, source in enumerate(result.get('sources', []), 1):
             print(f"  Source {i}:")

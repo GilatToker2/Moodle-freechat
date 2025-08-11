@@ -140,6 +140,7 @@ class FreeChatRequest(BaseModel):
 
 class FreeChatResponse(BaseModel):
     conversation_id: str
+    conversation_history: List[Dict[str, Any]]
     course_id: str
     user_message: str
     stage: str
@@ -247,6 +248,7 @@ async def free_chat_endpoint(request: FreeChatRequest):
 
     **Returns:**
     - All input fields preserved
+    - **conversation_history**: Updated conversation history including new exchange with context chunks
     - **final_answer**: RAG-based response in Hebrew
     - **sources**: Detailed information about sources used
     - **timestamp**: Response generation time
@@ -281,9 +283,10 @@ async def free_chat_endpoint(request: FreeChatRequest):
         else:
             logger.warning(f"Failed to generate answer: {result.get('error', 'Unknown error')}")
 
-        # Return cleaned response without conversation_history
+        # Return complete response with updated conversation_history
         return FreeChatResponse(
             conversation_id=result['conversation_id'],
+            conversation_history=result['conversation_history'],
             course_id=result['course_id'],
             user_message=result['user_message'],
             stage=result['stage'],
