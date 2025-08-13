@@ -24,6 +24,7 @@ from openai import AsyncAzureOpenAI
 from datetime import datetime
 
 from Source.Services.search_on_index import AdvancedUnifiedContentSearch
+from Source.Services.blob_manager import BlobManager
 from Config.config import (
     AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION,
     AZURE_OPENAI_CHAT_COMPLETION_MODEL, INDEX_NAME
@@ -56,7 +57,59 @@ class RAGSystem:
         )
 
         self.chat_model = AZURE_OPENAI_CHAT_COMPLETION_MODEL
+        self.blob_manager = BlobManager()
         logger.info(f"RAG System initialized with index: {index_name}, model: {self.chat_model}")
+
+    async def close(self):
+        """Close all async resources"""
+        try:
+            # Close OpenAI client
+            if hasattr(self, 'openai_client') and self.openai_client:
+                await self.openai_client.close()
+                logger.info("RAG System OpenAI client closed")
+
+            # Close search system resources
+            if hasattr(self, 'search_system') and self.search_system:
+                if hasattr(self.search_system, 'openai_client') and self.search_system.openai_client:
+                    await self.search_system.openai_client.close()
+                    logger.info("Search system OpenAI client closed")
+
+            # Close blob manager resources
+            if hasattr(self, 'blob_manager') and self.blob_manager:
+                if hasattr(self.blob_manager, '_async_client') and self.blob_manager._async_client:
+                    await self.blob_manager._async_client.close()
+                    logger.info("Blob manager client closed")
+
+        except Exception as e:
+            logger.error(f"Error closing RAG System resources: {e}")
+
+    async def _load_syllabus(self, course_id: str) -> str:
+        """
+        Load syllabus content for the given course_id from blob storage
+
+        Args:
+            course_id: Course identifier
+
+        Returns:
+            Syllabus content as string, or empty string if not found
+        """
+        try:
+            syllabus_blob_name = f"{course_id}/syllabus.md"
+
+            # Download syllabus content to memory
+            syllabus_bytes = await self.blob_manager.download_to_memory(syllabus_blob_name)
+
+            if syllabus_bytes:
+                syllabus_content = syllabus_bytes.decode('utf-8')
+                logger.info(f"Loaded syllabus for course {course_id} from blob: {syllabus_blob_name}")
+                return syllabus_content
+            else:
+                logger.warning(f"Syllabus file not found in blob: {syllabus_blob_name}")
+                return ""
+
+        except Exception as e:
+            logger.error(f"Error loading syllabus for course {course_id}: {e}")
+            return ""
 
     async def generate_answer(
             self,
@@ -88,7 +141,10 @@ class RAGSystem:
         try:
             logger.debug(f"Processing RAG query: {user_message}")
 
-            # Step 1: Search relevant chunks using semantic search
+            # Step 1: Load syllabus for the course
+            syllabus_content = await self._load_syllabus(course_id)
+
+            # Step 2: Search relevant chunks using semantic search
             search_results = await self.search_system.semantic_search(
                 query=user_message,
                 top_k=top_k,
@@ -113,11 +169,11 @@ class RAGSystem:
 
             logger.debug(f"Found {len(search_results)} relevant chunks")
 
-            # Step 2: Build context from chunks
+            # Step 3: Build context from chunks
             context = self._build_context_from_chunks(search_results)
 
-            # Step 3: Build messages array with conversation history and current query
-            messages = self._build_conversation_messages(conversation_history, user_message, context)
+            # Step 4: Build messages array with conversation history and current query
+            messages = self._build_conversation_messages(conversation_history, user_message, context, syllabus_content)
 
             # Log the final prompt for debugging
             logger.info("=== Final prompt being sent to model ===")
@@ -204,18 +260,18 @@ Relevant context:
 
         return "\n\n".join(context_parts)
 
-    def _build_conversation_messages(self, conversation_history: List[Dict], user_message: str, context: str) -> List[
+    def _build_conversation_messages(self, conversation_history: List[Dict], user_message: str, context: str, syllabus_content: str = "") -> List[
         Dict]:
         """
         Build messages array with proper conversation structure including system prompt,
-        conversation history, and current query with context
+        conversation history, and current query with context and syllabus
         """
         messages = []
 
-        # Add system message
+        # Add system message with syllabus context
         messages.append({
             "role": "system",
-            "content": self._get_system_prompt()
+            "content": self._get_system_prompt(syllabus_content)
         })
 
         # Add conversation history (all messages)
@@ -246,11 +302,11 @@ Relevant context:
 
         return messages
 
-    def _get_system_prompt(self) -> str:
+    def _get_system_prompt(self, syllabus_content: str = "") -> str:
         """
-        Define system behavior
+        Define system behavior with optional syllabus context
         """
-        return """You are an expert Hebrew-speaking tutoring assistant that operates inside a RAG pipeline.
+        base_prompt = """You are an expert Hebrew-speaking tutoring assistant that operates inside a RAG pipeline.
 
         Your role:
         - Answer in Hebrew accurately and helpfully
@@ -271,8 +327,25 @@ Relevant context:
         Guidelines for using the context:
         1. Answer based on the information provided in the context above
         2. Consider the conversation history for better understanding
-        3. If the context doesn't contain sufficient information for a complete answer, mention this
-        """
+        3. If the context doesn't contain sufficient information for a complete answer, mention this"""
+
+        # Add syllabus context if available
+        if syllabus_content:
+            syllabus_section = f"""
+
+        COURSE SYLLABUS:
+        The following is the course syllabus that provides important context about the course structure, topics, and learning objectives:
+
+        {syllabus_content}
+
+        Use this syllabus information to:
+        - Better understand the course context and structure
+        - Reference relevant topics from the syllabus when appropriate
+        - Help students understand how topics fit into the overall course structure"""
+
+            return base_prompt + syllabus_section
+
+        return base_prompt
 
     def _extract_sources_info(self, chunks: List[Dict]) -> List[Dict]:
         """
@@ -361,6 +434,9 @@ async def main():
         if not result['success']:
             print(f"Error: {result.get('error', 'Unknown error')}")
 
+        # Close RAG system resources
+        await rag.close()
+        logger.info("RAG system resources closed successfully")
 
     except Exception as e:
         print(f"Error: {e}")

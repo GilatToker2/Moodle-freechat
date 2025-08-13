@@ -5,7 +5,6 @@ Reads configuration from environment variables for security
 
 import os
 from dotenv import load_dotenv
-
 # Load environment variables from .env file
 load_dotenv()
 
@@ -21,6 +20,9 @@ SEARCH_SERVICE_NAME = os.getenv("SEARCH_SERVICE_NAME")
 SEARCH_API_KEY = os.getenv("SEARCH_API_KEY")
 INDEX_NAME = os.getenv("INDEX_NAME", "moodle-index-1")
 
+# Azure Storage Configuration
+STORAGE_CONNECTION_STRING = os.getenv("STORAGE_CONNECTION_STRING")
+CONTAINER_NAME = os.getenv("CONTAINER_NAME", "processeddata")  # Default value if not set
 
 # Validation - ensure critical environment variables are set
 def validate_config():
@@ -29,7 +31,8 @@ def validate_config():
         "AZURE_OPENAI_API_KEY",
         "AZURE_OPENAI_ENDPOINT",
         "SEARCH_SERVICE_NAME",
-        "SEARCH_API_KEY"
+        "SEARCH_API_KEY",
+        "STORAGE_CONNECTION_STRING"
     ]
 
     missing_vars = []
@@ -40,7 +43,7 @@ def validate_config():
     if missing_vars:
         raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
-    print("✅ All required environment variables are set")
+    print("All required environment variables are set")
 
 # Optional: Run validation when module is imported
 # Uncomment the line below if you want automatic validation

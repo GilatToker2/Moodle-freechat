@@ -81,22 +81,35 @@ async def lifespan(app: FastAPI):
 
     try:
         if rag_system:
-            # Close Azure OpenAI client
+            # Close RAG System OpenAI client
             if hasattr(rag_system, 'openai_client') and rag_system.openai_client:
                 await rag_system.openai_client.close()
-                logger.info("Azure OpenAI client closed")
+                logger.info("RAG System OpenAI client closed")
 
-            # Close Azure Search client (if it has async close method)
+            # Close Search System resources
             if hasattr(rag_system, 'search_system') and rag_system.search_system:
+                # Close search system OpenAI client
+                if hasattr(rag_system.search_system, 'openai_client') and rag_system.search_system.openai_client:
+                    await rag_system.search_system.openai_client.close()
+                    logger.info("Search system OpenAI client closed")
+
+                # Close Azure Search client (if it has async close method)
                 search_client = getattr(rag_system.search_system, 'search_client', None)
                 if search_client and hasattr(search_client, 'close'):
                     search_client.close()
                     logger.info("Azure Search client closed")
 
-                # Close OpenAI client in search system
-                if hasattr(rag_system.search_system, 'openai_client') and rag_system.search_system.openai_client:
-                    await rag_system.search_system.openai_client.close()
-                    logger.info("Search system OpenAI client closed")
+            # Close Blob Manager resources
+            if hasattr(rag_system, 'blob_manager') and rag_system.blob_manager:
+                if hasattr(rag_system.blob_manager, '_async_client') and rag_system.blob_manager._async_client:
+                    await rag_system.blob_manager._async_client.close()
+                    logger.info("Blob manager client closed")
+
+        # Close Assistant Helper resources
+        if assistant_helper:
+            if hasattr(assistant_helper, 'openai_client') and assistant_helper.openai_client:
+                await assistant_helper.openai_client.close()
+                logger.info("Assistant Helper OpenAI client closed")
 
         logger.info("All connections closed successfully")
 
