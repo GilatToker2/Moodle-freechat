@@ -78,7 +78,7 @@ class RAGSystem:
             if hasattr(self, 'blob_manager') and self.blob_manager:
                 if hasattr(self.blob_manager, '_async_client') and self.blob_manager._async_client:
                     await self.blob_manager._async_client.close()
-                    logger.info("Blob manager client closed")
+                    logger.info("Blob manager client - closed")
 
         except Exception as e:
             logger.error(f"Error closing RAG System resources: {e}")
