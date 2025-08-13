@@ -224,40 +224,40 @@ async def health_check():
 )
 async def free_chat_endpoint(request: FreeChatRequest):
     """
-    Free Chat with RAG-based Responses
+        Free Chat with RAG-based Responses
 
-    **Function Description:**
-    Provides conversational AI responses based on course content using RAG (Retrieval-Augmented Generation).
+        **Function Description:**
+        Provides conversational AI responses based on course content using RAG (Retrieval-Augmented Generation).
 
-    **What to Expect:**
-    • Searches relevant content from the knowledge base using semantic search
-    • Considers conversation history for context
-    • Generates responses based only on indexed course content
-    • Filters by course_id and optionally by source_id
-    • Returns both the answer and source information
+        **What to Expect:**
+        • Searches relevant content from the knowledge base using semantic search
+        • Considers conversation history for context
+        • Generates responses based only on indexed course content
+        • Filters by course_id and optionally by source_id
+        • Returns both the answer and source information
 
-    **Request Body Example:**
-    ```json
-    {
-        "conversation_id": "demo-123",
-        "conversation_history": [
+
+        **Request Body Example:**
+        ```
+        json
+        {
+          "conversation_id": "demo-123",
+          "conversation_history": [
             {
-                "role": "user",
-                "content": "User query: מה זה לוגיקה?
-                Relevant context:
-                    Source 1:לוגיקה היא תחום במתמטיקה העוסק בחוקי החשיבה הנכונה..."
+              "role": "user",
+              "content": "User query: מה זה לוגיקה?\\nRelevant context:\\n    Source 1: לוגיקה היא תחום במתמטיקה העוסק בחוקי החשיבה הנכונה..."
             },
             {
-                "role": "assistant",
-                "content": "לוגיקה היא תחום יסודי במתמטיקה שעוסק בחוקי החשיבה הנכונה..."
+              "role": "assistant",
+              "content": "לוגיקה היא תחום יסודי במתמטיקה שעוסק בחוקי החשיבה הנכונה..."
             }
-        ],
-        "course_id": "Discrete_mathematics",
-        "user_message": "מה זה יחס שקילות?",
-        "stage": "regular_chat",
-        "source_id": "2"
-    }
-    ```
+          ],
+          "course_id": "Discrete_mathematics",
+          "user_message": "אני רוצה חופשה",
+          "stage": "regular_chat"
+        }
+        ```
+
 
     **Parameters:**
     - **conversation_id**: Unique identifier for the conversation
