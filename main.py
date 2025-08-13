@@ -241,8 +241,14 @@ async def free_chat_endpoint(request: FreeChatRequest):
     {
         "conversation_id": "demo-123",
         "conversation_history": [
-            {"role": "user", "content": "Hello", "timestamp": "2025-01-01T10:00:00"},
-            {"role": "assistant", "content": "Hi there!", "timestamp": "2025-01-01T10:00:01"}
+            {
+                "role": "user",
+                "content": "User query: מה זה לוגיקה?\n\nRelevant context:\nSource 1:\nלוגיקה היא תחום במתמטיקה העוסק בחוקי החשיבה הנכונה..."
+            },
+            {
+                "role": "assistant",
+                "content": "לוגיקה היא תחום יסודי במתמטיקה שעוסק בחוקי החשיבה הנכונה..."
+            }
         ],
         "course_id": "Discrete_mathematics",
         "user_message": "מה זה יחס שקילות?",
@@ -424,7 +430,7 @@ async def test_myself_endpoint(request: AssistantRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in assistant help endpoint : {e}")
+        logger.error(f"Error in assistant help endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Assistant help failed: {str(e)}")
 
 
