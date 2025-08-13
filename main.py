@@ -424,7 +424,7 @@ async def test_myself_endpoint(request: AssistantRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in assistant help endpoint: {e}")
+        logger.error(f"Error in assistant help endpoint : {e}")
         raise HTTPException(status_code=500, detail=f"Assistant help failed: {str(e)}")
 
 
