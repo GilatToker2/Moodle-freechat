@@ -144,7 +144,7 @@ class AdvancedUnifiedContentSearch:
                 "search_text": query,
                 "select": [
                     "id", "content_type", "source_id", "course_id", "chunk_index",
-                    "text", "start_time", "end_time", "section_title", "created_date", "keywords", "topics"
+                    "text", "start_time", "end_time", "section_title", "created_date", "keywords", "topics", "file_name"
                 ],
                 "top": top_k,
                 "include_total_count": True
@@ -200,6 +200,11 @@ class AdvancedUnifiedContentSearch:
                     if section_title:
                         logger.info(f"  Section Title: {section_title}")
 
+                # Display file name if available
+                file_name = doc.get('file_name', '')
+                if file_name:
+                    logger.info(f"  File Name: {file_name}")
+
                 text = doc.get('text', '')
                 if text:
                     preview = text[:200] + "..." if len(text) > 200 else text
@@ -234,7 +239,7 @@ class AdvancedUnifiedContentSearch:
                 )],
                 "select": [
                     "id", "content_type", "source_id", "course_id", "chunk_index",
-                    "text", "start_time", "end_time", "section_title", "created_date", "keywords", "topics"
+                    "text", "start_time", "end_time", "section_title", "created_date", "keywords", "topics", "file_name"
                 ],
                 "top": 50,
                 "include_total_count": True
@@ -293,6 +298,11 @@ class AdvancedUnifiedContentSearch:
                     if section_title:
                         logger.info(f"  Section Title: {section_title}")
 
+                # Display file name if available
+                file_name = doc.get('file_name', '')
+                if file_name:
+                    logger.info(f"  File Name: {file_name}")
+
                 text = doc.get('text', '')
                 if text:
                     preview = text[:200] + "..." if len(text) > 200 else text
@@ -332,7 +342,7 @@ class AdvancedUnifiedContentSearch:
                 )],
                 "select": [
                     "id", "content_type", "source_id", "course_id", "chunk_index",
-                    "text", "start_time", "end_time", "section_title", "created_date", "keywords", "topics"
+                    "text", "start_time", "end_time", "section_title", "created_date", "keywords", "topics", "file_name"
                 ],
                 "top": top_k
             }
@@ -386,6 +396,11 @@ class AdvancedUnifiedContentSearch:
                     section_title = doc.get('section_title', '')
                     if section_title:
                         logger.info(f"  Section Title: {section_title}")
+
+                # Display file name if available
+                file_name = doc.get('file_name', '')
+                if file_name:
+                    logger.info(f"  File Name: {file_name}")
 
                 text = doc.get('text', '')
                 if text:
