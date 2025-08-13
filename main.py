@@ -243,7 +243,9 @@ async def free_chat_endpoint(request: FreeChatRequest):
         "conversation_history": [
             {
                 "role": "user",
-                "content": "User query: מה זה לוגיקה?\n\nRelevant context:\nSource 1:\nלוגיקה היא תחום במתמטיקה העוסק בחוקי החשיבה הנכונה..."
+                "content": "User query: מה זה לוגיקה?
+                Relevant context:
+                    Source 1:לוגיקה היא תחום במתמטיקה העוסק בחוקי החשיבה הנכונה..."
             },
             {
                 "role": "assistant",
