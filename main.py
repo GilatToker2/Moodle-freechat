@@ -238,22 +238,23 @@ async def free_chat_endpoint(request: FreeChatRequest):
 
 
         **Request Body Example:**
-        ```
-        json
+        ```json
         {
           "conversation_id": "demo-123",
           "conversation_history": [
             {
               "role": "user",
-              "content": "User query: מה זה לוגיקה?\\nRelevant context:\\n    Source 1: לוגיקה היא תחום במתמטיקה העוסק בחוקי החשיבה הנכונה..."
+              "content": "User query: מה זה לוגיקה?\\n\\nRelevant context:\\nSource 1: לוגיקה היא תחום במתמטיקה העוסק בחוקי החשיבה הנכונה",
+              "timestamp": "2025-01-14T08:45:00.123456"
             },
             {
               "role": "assistant",
-              "content": "לוגיקה היא תחום יסודי במתמטיקה שעוסק בחוקי החשיבה הנכונה..."
+              "content": "לוגיקה היא תחום יסודי במתמטיקה שעוסק בחוקי החשיבה הנכונה",
+              "timestamp": "2025-01-14T08:45:02.789012"
             }
           ],
           "course_id": "Discrete_mathematics",
-          "user_message": "אני רוצה חופשה",
+          "user_message": "תן לי דוגמא לטבלת אמת",
           "stage": "regular_chat"
         }
         ```
@@ -261,7 +262,7 @@ async def free_chat_endpoint(request: FreeChatRequest):
 
     **Parameters:**
     - **conversation_id**: Unique identifier for the conversation
-    - **conversation_history**: List of previous messages for context
+    - **conversation_history**: List of previous messages for context (each message includes role, content, and timestamp)
     - **course_id**: Course identifier to filter relevant content
     - **user_message**: Current user question/message
     - **stage**: User stage (regular_chat/quiz_mode/presentation_discussion)
@@ -359,8 +360,8 @@ async def test_myself_endpoint(request: AssistantRequest):
     {
         "conversation_id": "demo-123",
         "conversation_history": [
-            {"role": "user", "content": "היי"},
-            {"role": "assistant", "content": "שלום, איך אוכל לעזור לך היום?"}
+            {"role": "user", "content": "היי", "timestamp": "2025-01-14T08:45:00.123456"},
+            {"role": "assistant", "content": "שלום, איך אוכל לעזור לך היום?", "timestamp": "2025-01-14T08:45:01.789012"}
         ],
         "mode": "lecture",
         "identifier": "13",
@@ -371,7 +372,7 @@ async def test_myself_endpoint(request: AssistantRequest):
     **Parameters:**
     - **conversation_id**: Unique identifier for the conversation session
     - **conversation_history**: List of previous messages in the conversation for context
-        - Each message contains: role ("user"/"assistant"), content (message text)
+        - Each message contains: role ("user"/"assistant"), content (message text), and timestamp
     - **mode**: "lecture" (specific file/source) or "full_course" (entire course)
     - **identifier**: source_id (for lecture mode) or course_id (for full_course mode)
     - **query**: Student's current question or request for help
