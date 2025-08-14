@@ -173,6 +173,7 @@ class AssistantRequest(BaseModel):
 
 class AssistantResponse(BaseModel):
     conversation_id: str
+    conversation_history: List[Dict[str, Any]]
     mode: str
     identifier: str
     query: str
@@ -378,6 +379,7 @@ async def test_myself_endpoint(request: AssistantRequest):
     - **query**: Student's current question or request for help
 
     **Returns:**
+    - **conversation_history**: Updated conversation history including new exchange with timestamps
     - **mode**: The assistance mode used
     - **identifier**: The identifier used for search
     - **query**: The original student query
@@ -421,6 +423,7 @@ async def test_myself_endpoint(request: AssistantRequest):
         # Return response
         return AssistantResponse(
             conversation_id=result['conversation_id'],
+            conversation_history=result['conversation_history'],
             mode=result['mode'],
             identifier=result['identifier'],
             query=result['query'],

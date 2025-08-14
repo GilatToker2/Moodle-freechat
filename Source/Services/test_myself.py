@@ -165,8 +165,26 @@ class AssistantHelper:
                     "preview": result.get('text', '')[:150] + "..."
                 })
 
+            # Build updated conversation history with timestamps
+            updated_conversation_history = conversation_history.copy() if conversation_history else []
+
+            # Add user query to history
+            updated_conversation_history.append({
+                "role": "user",
+                "content": query,
+                "timestamp": datetime.now().isoformat()
+            })
+
+            # Add assistant response to history
+            updated_conversation_history.append({
+                "role": "assistant",
+                "content": ai_response,
+                "timestamp": datetime.now().isoformat()
+            })
+
             return {
                 "conversation_id": conversation_id,
+                "conversation_history": updated_conversation_history,
                 "mode": mode,
                 "identifier": identifier,
                 "query": query,
