@@ -417,26 +417,139 @@ class AdvancedUnifiedContentSearch:
             # Fallback to regular hybrid search
             return await self.hybrid_search(query, top_k, source_id, course_id)
 
+    async def get_adjacent_chunks(self, chunk: Dict) -> List[Dict]:
+        """
+        Get adjacent chunks (before and after) for a given chunk
+
+        Args:
+            chunk: The original chunk to find adjacent chunks for
+
+        Returns:
+            List of adjacent chunks (before and after the original chunk)
+        """
+        try:
+            source_id = chunk.get('source_id')
+            course_id = chunk.get('course_id')
+            chunk_index = chunk.get('chunk_index')
+
+            if not all([source_id, course_id, chunk_index is not None]):
+                logger.warning(f"Missing required fields for adjacent chunk search: source_id={source_id}, course_id={course_id}, chunk_index={chunk_index}")
+                return []
+
+            adjacent_chunks = []
+
+            # Search for chunk before (chunk_index - 1)
+            if chunk_index > 0:
+                try:
+                    escaped_source_id = source_id.replace("'", "''")
+                    escaped_course_id = course_id.replace("'", "''")
+                    before_filter = f"source_id eq '{escaped_source_id}' and course_id eq '{escaped_course_id}' and chunk_index eq {chunk_index - 1}"
+                    before_results = self.search_client.search(
+                        search_text="*",
+                        filter=before_filter,
+                        select=[
+                            "id", "content_type", "source_id", "course_id", "chunk_index",
+                            "text", "start_time", "end_time", "section_title", "created_date", "keywords", "topics", "file_name"
+                        ],
+                        top=1
+                    )
+                    before_docs = list(before_results)
+                    if before_docs:
+                        adjacent_chunks.extend(before_docs)
+                        logger.info(f"Found chunk before: {chunk_index - 1}")
+                except Exception as e:
+                    logger.warning(f"Error searching for chunk before {chunk_index}: {e}")
+
+            # Search for chunk after (chunk_index + 1)
+            try:
+                escaped_source_id = source_id.replace("'", "''")
+                escaped_course_id = course_id.replace("'", "''")
+                after_filter = f"source_id eq '{escaped_source_id}' and course_id eq '{escaped_course_id}' and chunk_index eq {chunk_index + 1}"
+                after_results = self.search_client.search(
+                    search_text="*",
+                    filter=after_filter,
+                    select=[
+                        "id", "content_type", "source_id", "course_id", "chunk_index",
+                        "text", "start_time", "end_time", "section_title", "created_date", "keywords", "topics", "file_name"
+                    ],
+                    top=1
+                )
+                after_docs = list(after_results)
+                if after_docs:
+                    adjacent_chunks.extend(after_docs)
+                    logger.info(f"Found chunk after: {chunk_index + 1}")
+            except Exception as e:
+                logger.warning(f"Error searching for chunk after {chunk_index}: {e}")
+
+            logger.debug(f"Found {len(adjacent_chunks)} adjacent chunks for chunk {chunk_index}")
+            return adjacent_chunks
+
+        except Exception as e:
+            logger.error(f"Error getting adjacent chunks: {e}")
+            return []
+
+
     async def search_best_answers(self, query: str, k: int = 5, source_id: str = None, course_id: str = None) -> List[Dict]:
         """
-        Simple function that receives a question and returns K best answers
+        Enhanced function that receives a question and returns K best answers WITH adjacent chunks
+        For each of the top K chunks found, also retrieves the chunk before and after it
         Uses semantic search as default, with fallback to hybrid
-        Returns only the data without prints
 
         Args:
             query: Search query
             k: Number of best results to return
             source_id: Optional - if specified, will search only in this specific source
             course_id: Optional - if specified, will search only in this specific course
+
+        Returns:
+            List of chunks including original results and their adjacent chunks
         """
         try:
-            # Use semantic search which is the smartest
-            results = await self.semantic_search(query, k, source_id, course_id)
-            return results
-        except Exception:
-            # fallback to hybrid if semantic fails
-            results = await self.hybrid_search(query, k, source_id, course_id)
-            return results
+            # Step 1: Get the top K semantic search results
+            logger.info(f"Searching for top {k} chunks for query: {query}")
+            try:
+                original_results = await self.semantic_search(query, k, source_id, course_id)
+            except Exception:
+                # fallback to hybrid if semantic fails
+                original_results = await self.hybrid_search(query, k, source_id, course_id)
+
+            if not original_results:
+                logger.warning("No original results found")
+                return []
+
+            # Step 2: For each result, get adjacent chunks
+            all_chunks = []
+            seen_chunk_ids = set()  # To avoid duplicates
+
+            for i, chunk in enumerate(original_results):
+                # Add the original chunk first
+                chunk_id = chunk.get('id')
+                if chunk_id and chunk_id not in seen_chunk_ids:
+                    all_chunks.append(chunk)
+                    seen_chunk_ids.add(chunk_id)
+                    logger.debug(f"Added original chunk {i+1}: {chunk.get('source_id')}-{chunk.get('chunk_index')}")
+
+                # Get and add adjacent chunks
+                adjacent_chunks = await self.get_adjacent_chunks(chunk)
+                for adj_chunk in adjacent_chunks:
+                    adj_chunk_id = adj_chunk.get('id')
+                    if adj_chunk_id and adj_chunk_id not in seen_chunk_ids:
+                        all_chunks.append(adj_chunk)
+                        seen_chunk_ids.add(adj_chunk_id)
+                        logger.debug(f"Added adjacent chunk: {adj_chunk.get('source_id')}-{adj_chunk.get('chunk_index')}")
+
+            logger.info(f"Total chunks retrieved: {len(all_chunks)} (original: {len(original_results)}, with adjacent: {len(all_chunks) - len(original_results)})")
+            return all_chunks
+
+        except Exception as e:
+            logger.error(f"Error in search_best_answers: {e}")
+            # Fallback to original search without context
+            try:
+                results = await self.semantic_search(query, k, source_id, course_id)
+                return results
+            except Exception:
+                results = await self.hybrid_search(query, k, source_id, course_id)
+                return results
 
     def _build_filter_message(self, source_id: str = None, course_id: str = None) -> str:
         """Build filter message for display"""
@@ -481,29 +594,34 @@ async def run_unified_search_demo():
             logger.info(f"Query {i} of {len(demo_queries)}: '{query}'")
             logger.info(f"{'=' * 80}")
 
-            # 1. Search all content
-            logger.info(f"\n1. Search all content (videos + documents):")
-            logger.info("-" * 50)
-            await search_system.semantic_search(query, top_k=5)
+
+            # 1. Search all content with enhanced context (adjacent chunks)
+            logger.info(f"\n1. Enhanced search all content (videos + documents) with adjacent chunks:")
+            logger.info("-" * 70)
+            results = await search_system.search_best_answers(query, k=5)
+            logger.info(f"Enhanced search returned {len(results)} total chunks")
 
             logger.info("\n" + "=" * 80)
 
-            # 2. Search specific video
-            logger.info(f"\n2. Search specific video:")
-            logger.info("-" * 40)
-            # Assume we have a video with this ID (you'll need to replace with real ID)
-            sample_video_id = "13"
-            logger.info(f"Search in video: {sample_video_id}")
-            await search_system.semantic_search(query, top_k=5, source_id=sample_video_id)
+            # # 2. Search specific video with enhanced context
+            # logger.info(f"\n2. Enhanced search specific video with adjacent chunks:")
+            # logger.info("-" * 60)
+            # # Assume we have a video with this ID (you'll need to replace with real ID)
+            # sample_video_id = "13"
+            # logger.info(f"Search in video: {sample_video_id}")
+            # results = await search_system.search_best_answers(query, k=5, source_id=sample_video_id)
+            # logger.info(f"Enhanced search returned {len(results)} total chunks")
+            #
+            # logger.info("\n" + "=" * 80)
+            #
+            # # 3. Search specific course with enhanced context
+            # logger.info(f"\n3. Enhanced search specific course with adjacent chunks:")
+            # logger.info("-" * 60)
+            # sample_course_id = "Discrete_mathematics"
+            # logger.info(f"Search in course: {sample_course_id}")
+            # results = await search_system.search_best_answers(query, k=5, course_id=sample_course_id)
+            # logger.info(f"Enhanced search returned {len(results)} total chunks")
 
-            logger.info("\n" + "=" * 80)
-
-            # 3. Search specific course
-            logger.info(f"\n3. Search specific course:")
-            logger.info("-" * 35)
-            sample_course_id = "Discrete_mathematics"
-            logger.info(f"Search in course: {sample_course_id}")
-            await search_system.semantic_search(query, top_k=5, course_id=sample_course_id)
 
             # Break between queries
             if i < len(demo_queries):

@@ -25,6 +25,7 @@ from datetime import datetime
 
 from Source.Services.search_on_index import AdvancedUnifiedContentSearch
 from Source.Services.blob_manager import BlobManager
+from Source.Services.prompt_loader import get_prompt_loader
 from Config.config import (
     AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION,
     AZURE_OPENAI_CHAT_COMPLETION_MODEL, INDEX_NAME
@@ -40,24 +41,35 @@ class RAGSystem:
     Complete RAG System - Search + Answer Generation
     """
 
-    def __init__(self, index_name: str = INDEX_NAME):
+    def __init__(self,
+                 openai_client: AsyncAzureOpenAI = None,
+                 search_system: AdvancedUnifiedContentSearch = None,
+                 blob_manager: BlobManager = None,
+                 prompt_loader = None,
+                 index_name: str = INDEX_NAME):
         """
         Initialize RAG System
 
         Args:
-            index_name: Index name for search
+            openai_client: Shared OpenAI client
+            search_system: Shared search system
+            blob_manager: Shared blob manager
+            prompt_loader: Shared prompt loader
+            index_name: Index name for search (fallback)
         """
         self.index_name = index_name
-        self.search_system = AdvancedUnifiedContentSearch(index_name)
 
-        self.openai_client = AsyncAzureOpenAI(
+        # Use provided objects or create fallbacks
+        self.search_system = search_system or AdvancedUnifiedContentSearch(index_name)
+        self.openai_client = openai_client or AsyncAzureOpenAI(
             api_key=AZURE_OPENAI_API_KEY,
             api_version=AZURE_OPENAI_API_VERSION,
             azure_endpoint=AZURE_OPENAI_ENDPOINT
         )
+        self.blob_manager = blob_manager or BlobManager()
+        self.prompt_loader = prompt_loader or get_prompt_loader()
 
         self.chat_model = AZURE_OPENAI_CHAT_COMPLETION_MODEL
-        self.blob_manager = BlobManager()
         logger.info(f"RAG System initialized with index: {index_name}, model: {self.chat_model}")
 
     async def close(self):
@@ -144,10 +156,10 @@ class RAGSystem:
             # Step 1: Load syllabus for the course
             syllabus_content = await self._load_syllabus(course_id)
 
-            # Step 2: Search relevant chunks using semantic search
-            search_results = await self.search_system.semantic_search(
+            # Step 2: Search relevant chunks using enhanced search with adjacent chunks
+            search_results = await self.search_system.search_best_answers(
                 query=user_message,
-                top_k=top_k,
+                k=top_k,
                 source_id=source_id,
                 course_id=course_id
             )
@@ -304,48 +316,18 @@ Relevant context:
 
     def _get_system_prompt(self, syllabus_content: str = "") -> str:
         """
-        Define system behavior with optional syllabus context
+        Define system behavior with optional syllabus context using injected prompt_loader
         """
-        base_prompt = """You are an expert Hebrew-speaking tutoring assistant that operates inside a RAG pipeline.
-
-        Your role:
-        - Answer in Hebrew accurately and helpfully
-        - Base your answer only on the information provided in the context
-        - Consider the conversation history for context
-        - If the information is not sufficient for a complete answer, mention this
-        - Organize the answer logically and clearly
-        - This is a dedicated model to help students learn the material. If asked about something unrelated, respond that this is not its role.
-
-        Response style:
-        - Respond like an encouraging and interactive chatbot, not just a static answer
-        - Use a friendly and pedagogical tone to support learning and exploration
-        - Clear and professional
-        - Structured and organized
-        - Suitable for students and learners
-        - Include examples when relevant
-
-        Guidelines for using the context:
-        1. Answer based on the information provided in the context above
-        2. Consider the conversation history for better understanding
-        3. If the context doesn't contain sufficient information for a complete answer, mention this"""
-
-        # Add syllabus context if available
         if syllabus_content:
-            syllabus_section = f"""
-
-        COURSE SYLLABUS:
-        The following is the course syllabus that provides important context about the course structure, topics, and learning objectives:
-
-        {syllabus_content}
-
-        Use this syllabus information to:
-        - Better understand the course context and structure
-        - Reference relevant topics from the syllabus when appropriate
-        - Help students understand how topics fit into the overall course structure"""
-
-            return base_prompt + syllabus_section
-
-        return base_prompt
+            # Use the prompt with syllabus
+            return self.prompt_loader.get_prompt(
+                "free_chat",
+                "system - עם סילבוס",
+                syllabus_content=syllabus_content
+            )
+        else:
+            # Use the basic prompt
+            return self.prompt_loader.get_prompt("free_chat", "system")
 
     def _extract_sources_info(self, chunks: List[Dict]) -> List[Dict]:
         """

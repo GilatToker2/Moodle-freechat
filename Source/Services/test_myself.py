@@ -9,6 +9,7 @@ from openai import AsyncAzureOpenAI
 from datetime import datetime
 
 from Source.Services.search_on_index import AdvancedUnifiedContentSearch
+from Source.Services.prompt_loader import get_prompt_loader
 from Config.config import (
     AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION,
     AZURE_OPENAI_CHAT_COMPLETION_MODEL, INDEX_NAME
@@ -21,13 +22,26 @@ logger = setup_logging()
 class AssistantHelper:
     """Simple AI Assistant for course content"""
 
-    def __init__(self):
-        self.search_system = AdvancedUnifiedContentSearch(INDEX_NAME)
-        self.openai_client = AsyncAzureOpenAI(
+    def __init__(self,
+                 openai_client: AsyncAzureOpenAI = None,
+                 search_system: AdvancedUnifiedContentSearch = None,
+                 prompt_loader = None):
+        """
+        Initialize Assistant Helper
+
+        Args:
+            openai_client: Shared OpenAI client
+            search_system: Shared search system
+            prompt_loader: Shared prompt loader
+        """
+        # Use provided objects or create fallbacks
+        self.search_system = search_system or AdvancedUnifiedContentSearch(INDEX_NAME)
+        self.openai_client = openai_client or AsyncAzureOpenAI(
             api_key=AZURE_OPENAI_API_KEY,
             api_version=AZURE_OPENAI_API_VERSION,
             azure_endpoint=AZURE_OPENAI_ENDPOINT
         )
+        self.prompt_loader = prompt_loader or get_prompt_loader()
         self.chat_model = AZURE_OPENAI_CHAT_COMPLETION_MODEL
 
     async def get_help(
@@ -97,31 +111,15 @@ class AssistantHelper:
             # Build conversation context
             conversation_context = self._build_conversation_context(conversation_history)
 
-            # Create prompt for educational assistance
-            prompt = f"""אתה מורה AI מתקדם שמטרתו לעזור לסטודנטים ללמוד באמצעות שאלות מנחות ולוויה בפתרון.
-
-{conversation_context}
-
-התוכן הרלוונטי מהקורס:
-{context}
-
-בקשת הסטודנט הנוכחית: {query}
-
-המשימה שלך:
-1. אם הסטודנט שואל שאלה כללית על הנושא - צור שאלות מנחות שיעזרו לו להבין את החומר לעומק
-2. אם הסטודנט מבקש עזרה בפתרון - לווה אותו צעד אחר צעד בלי לתת את התשובה המלאה מיד
-3. אם הסטודנט תקוע - תן רמזים ושאלות שיובילו אותו לפתרון
-4. קח בחשבון את השיחה הקודמת כדי להמשיך בצורה טבעית
-
-עקרונות חשובים:
-- עודד חשיבה עצמאית
-- שאל שאלות שיובילו להבנה
-- תן הסברים הדרגתיים
-- התבסס אך ורק על התוכן שסופק
-- השתמש בדוגמאות מהחומר
-- התייחס להקשר השיחה הקודמת
-
-התשובה שלך:"""
+            # Get prompts using injected prompt_loader
+            system_prompt = self.prompt_loader.get_prompt("test_myself", "system")
+            user_prompt = self.prompt_loader.get_prompt(
+                "test_myself",
+                "user",
+                conversation_context=conversation_context,
+                context=context,
+                query=query
+            )
 
             # Get AI response
             response = await self.openai_client.chat.completions.create(
@@ -129,23 +127,11 @@ class AssistantHelper:
                 messages=[
                     {
                         "role": "system",
-                        "content": """אתה מורה AI מתמחה בלמידה אינטראקטיבית. המטרה שלך היא לעזור לסטודנטים ללמוד באמצעות:
-
-1. יצירת שאלות מנחות שמובילות להבנה עמוקה
-2. לוויה בפתרון בלי לתת תשובות מוכנות
-3. עידוד חשיבה עצמאית וגילוי עצמי
-
-סגנון הוראה:
-- שאל שאלות שמובילות לתובנות
-- תן רמזים במקום תשובות ישירות
-- עודד את הסטודנט לנסות ולחשוב
-- חזור על מושגים חשובים
-- השתמש בדוגמאות מהחומר
-- ענה בעברית בצורה ברורה ומעודדת"""
+                        "content": system_prompt
                     },
                     {
                         "role": "user",
-                        "content": prompt
+                        "content": user_prompt
                     }
                 ],
                 max_tokens=8000,

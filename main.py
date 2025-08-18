@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 from Config.logging_config import setup_logging
 from Source.Services.free_chat import RAGSystem
 from Source.Services.test_myself import AssistantHelper
+from Source.Services.prompt_loader import initialize_prompt_loader
 
 # Initialize logger
 logger = setup_logging()
@@ -31,9 +32,37 @@ def debug_log(message):
     logger.debug(message)
 
 
-# Global variables to hold systems
-rag_system = None
-assistant_helper = None
+# ================================
+# SERVICE GETTERS - Get services from app.state (initialized in lifespan)
+# ================================
+
+def get_rag_system():
+    """Get the shared RAG System"""
+    return getattr(app.state, "rag_system", None) or RAGSystem()
+
+
+def get_assistant_helper():
+    """Get the shared Assistant Helper"""
+    return getattr(app.state, "assistant_helper", None) or AssistantHelper()
+
+
+def get_prompt_service():
+    """Get the shared Prompt Loader"""
+    from Source.Services.prompt_loader import get_prompt_loader as fallback_get_prompt_loader
+    return getattr(app.state, "prompt_loader", None) or fallback_get_prompt_loader()
+
+
+def get_blob_manager():
+    """Get the shared Blob Manager"""
+    from Source.Services.blob_manager import BlobManager
+    return getattr(app.state, "blob_manager", None) or BlobManager()
+
+
+def get_search_system():
+    """Get the shared Search System"""
+    from Source.Services.search_on_index import AdvancedUnifiedContentSearch
+    from Config.config import INDEX_NAME
+    return getattr(app.state, "search_system", None) or AdvancedUnifiedContentSearch(INDEX_NAME)
 
 
 @asynccontextmanager
@@ -46,75 +75,134 @@ async def lifespan(app: FastAPI):
     - Shutdown: Close connections gracefully
 
     Managed connections:
+    - Prompt Loader with all prompts preloaded
     - Azure OpenAI clients (AsyncAzureOpenAI)
     - Azure Search clients (SearchClient)
-    - Background tasks and async workers
+    - Azure Blob Storage clients
+    - RAG System and Assistant Helper
     """
-    global rag_system, assistant_helper
-
     # STARTUP - Application initialization
-    logger.info("App is starting...")
-    logger.info("Initializing connections...")
+    logger.info("App is starting - Initializing services...")
 
     try:
-        # Initialize RAG system with all its connections
-        rag_system = RAGSystem()
+        # Initialize and preload all prompts at startup FIRST
+        logger.info("Initializing and preloading all prompts...")
+        prompt_loader = initialize_prompt_loader()
+        app.state.prompt_loader = prompt_loader
+        logger.info("All prompts preloaded successfully")
+
+        # Initialize shared OpenAI client
+        logger.info("Initializing shared OpenAI client...")
+        from openai import AsyncAzureOpenAI
+        from Config.config import AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION
+
+        shared_openai_client = AsyncAzureOpenAI(
+            api_key=AZURE_OPENAI_API_KEY,
+            api_version=AZURE_OPENAI_API_VERSION,
+            azure_endpoint=AZURE_OPENAI_ENDPOINT
+        )
+        app.state.shared_openai_client = shared_openai_client
+        logger.info("Shared OpenAI client initialized successfully")
+
+        # Initialize shared search system
+        logger.info("Initializing shared search system...")
+        from Source.Services.search_on_index import AdvancedUnifiedContentSearch
+        from Config.config import INDEX_NAME
+
+        shared_search_system = AdvancedUnifiedContentSearch(INDEX_NAME)
+        app.state.shared_search_system = shared_search_system
+        logger.info("Shared search system initialized successfully")
+
+        # Initialize shared blob manager
+        logger.info("Initializing shared blob manager...")
+        from Source.Services.blob_manager import BlobManager
+
+        shared_blob_manager = BlobManager()
+        app.state.shared_blob_manager = shared_blob_manager
+        logger.info("Shared blob manager initialized successfully")
+
+        # Initialize RAG system with shared objects
+        logger.info("Initializing RAG System with shared objects...")
+        rag_system = RAGSystem(
+            openai_client=shared_openai_client,
+            search_system=shared_search_system,
+            blob_manager=shared_blob_manager,
+            prompt_loader=prompt_loader
+        )
+        app.state.rag_system = rag_system
         logger.info("RAG System initialized successfully")
 
-        # Initialize Assistant Helper
-        assistant_helper = AssistantHelper()
+        # Initialize Assistant Helper with shared objects
+        logger.info("Initializing Assistant Helper with shared objects...")
+        assistant_helper = AssistantHelper(
+            openai_client=shared_openai_client,
+            search_system=shared_search_system,
+            prompt_loader=prompt_loader
+        )
+        app.state.assistant_helper = assistant_helper
         logger.info("Assistant Helper initialized successfully")
 
-        logger.info("Azure OpenAI client connected")
-        logger.info("Azure Search client connected")
+        logger.info("All services initialized successfully - Application ready!")
 
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}")
         raise
 
-    # Application runs here...
+    # Application is running
     yield
 
-    # SHUTDOWN - Application cleanup
-    logger.info("App is shutting down...")
-    logger.info("Closing connections gracefully...")
+    # SHUTDOWN - Clean up resources and close connections
+    logger.info("App is shutting down - Cleaning up resources...")
 
     try:
-        if rag_system:
-            # Close RAG System OpenAI client
-            if hasattr(rag_system, 'openai_client') and rag_system.openai_client:
-                await rag_system.openai_client.close()
-                logger.info("RAG System OpenAI client closed")
+        # Close shared OpenAI client (used by both RAG and Assistant Helper)
+        if hasattr(app.state, "shared_openai_client"):
+            try:
+                await app.state.shared_openai_client.close()
+                logger.info("Shared OpenAI client closed")
+            except Exception as e:
+                logger.warning(f"Error closing shared OpenAI client: {e}")
 
-            # Close Search System resources
-            if hasattr(rag_system, 'search_system') and rag_system.search_system:
-                # Close search system OpenAI client
-                if hasattr(rag_system.search_system, 'openai_client') and rag_system.search_system.openai_client:
-                    await rag_system.search_system.openai_client.close()
+        # Close shared search system resources
+        if hasattr(app.state, "shared_search_system"):
+            search_system = app.state.shared_search_system
+            logger.info("Closing shared search system resources...")
+
+            # Close search system OpenAI client
+            if hasattr(search_system, 'openai_client') and search_system.openai_client:
+                try:
+                    await search_system.openai_client.close()
                     logger.info("Search system OpenAI client closed")
+                except Exception as e:
+                    logger.warning(f"Error closing Search system OpenAI client: {e}")
 
-                # Close Azure Search client (if it has async close method)
-                search_client = getattr(rag_system.search_system, 'search_client', None)
-                if search_client and hasattr(search_client, 'close'):
+            # Close Azure Search client
+            search_client = getattr(search_system, 'search_client', None)
+            if search_client and hasattr(search_client, 'close'):
+                try:
                     search_client.close()
                     logger.info("Azure Search client closed")
+                except Exception as e:
+                    logger.warning(f"Error closing Azure Search client: {e}")
 
-            # Close Blob Manager resources
-            if hasattr(rag_system, 'blob_manager') and rag_system.blob_manager:
-                if hasattr(rag_system.blob_manager, '_async_client') and rag_system.blob_manager._async_client:
-                    await rag_system.blob_manager._async_client.close()
-                    logger.info("Blob manager client closed")
+        # Close shared blob manager resources
+        if hasattr(app.state, "shared_blob_manager"):
+            blob_manager = app.state.shared_blob_manager
+            logger.info("Closing shared blob manager resources...")
 
-        # Close Assistant Helper resources
-        if assistant_helper:
-            if hasattr(assistant_helper, 'openai_client') and assistant_helper.openai_client:
-                await assistant_helper.openai_client.close()
-                logger.info("Assistant Helper OpenAI client closed")
+            if hasattr(blob_manager, '_async_client') and blob_manager._async_client:
+                try:
+                    await blob_manager._async_client.close()
+                    logger.info("Shared blob manager client closed")
+                except Exception as e:
+                    logger.warning(f"Error closing shared blob manager: {e}")
 
-        logger.info("All connections closed successfully")
+        logger.info("All shared resources cleaned up successfully")
 
     except Exception as e:
-        logger.error(f"Error during shutdown: {e}")
+        logger.error(f"Error during cleanup: {e}")
+
+    logger.info("Application shutdown completed")
 
 
 # Initialize FastAPI app with lifespan
@@ -290,7 +378,8 @@ async def free_chat_endpoint(request: FreeChatRequest):
         if not request.stage:
             raise HTTPException(status_code=400, detail="stage is required")
 
-        # Call RAG system
+        # Get RAG system using getter function
+        rag_system = get_rag_system()
         result = await rag_system.generate_answer(
             conversation_id=request.conversation_id,
             conversation_history=request.conversation_history,
@@ -405,7 +494,8 @@ async def test_myself_endpoint(request: AssistantRequest):
         if request.mode not in ["lecture", "full_course"]:
             raise HTTPException(status_code=400, detail="mode must be 'lecture' or 'full_course'")
 
-        # Call Assistant Helper
+        # Get assistant helper using getter function
+        assistant_helper = get_assistant_helper()
         result = await assistant_helper.get_help(
             conversation_id=request.conversation_id,
             conversation_history=request.conversation_history,
