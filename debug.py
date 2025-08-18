@@ -53,7 +53,7 @@ async def debug_index_fields():
                 if similar_fields:
                     print(f"🔍 Similar fields found: {similar_fields}")
         else:
-            print("❌ No documents found in index")
+            print("No documents found in index")
 
     except Exception as e:
         print(f"❌ Error: {e}")
