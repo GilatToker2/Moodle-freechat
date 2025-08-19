@@ -100,7 +100,7 @@ class PromptLoader:
         # Map prompt types to file names - fixing name mismatches
         prompt_files = {
             'free_chat': 'free_chat_prompt',
-            'test_myself': 'test_myself_prompt'
+            'test_myself': 'quiz_myself_prompt'
         }
 
         logger.info("Preloading all prompts into cache...")
