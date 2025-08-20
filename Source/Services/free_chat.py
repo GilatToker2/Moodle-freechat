@@ -45,7 +45,7 @@ class RAGSystem:
                  openai_client: AsyncAzureOpenAI = None,
                  search_system: AdvancedUnifiedContentSearch = None,
                  blob_manager: BlobManager = None,
-                 prompt_loader = None,
+                 prompt_loader=None,
                  index_name: str = INDEX_NAME):
         """
         Initialize RAG System
@@ -71,6 +71,24 @@ class RAGSystem:
 
         self.chat_model = AZURE_OPENAI_CHAT_COMPLETION_MODEL
         logger.info(f"RAG System initialized with index: {index_name}, model: {self.chat_model}")
+
+    def _remove_duplicates_by_id(self, chunks: List[Dict]) -> List[Dict]:
+        if not chunks:
+            return []
+
+        seen_ids = set()
+        unique_chunks = []
+
+        for chunk in chunks:
+            chunk_id = chunk.get('id')
+            if chunk_id and chunk_id not in seen_ids:
+                seen_ids.add(chunk_id)
+                unique_chunks.append(chunk)
+
+        if len(unique_chunks) < len(chunks):
+            logger.info(f"Deleted: {len(chunks) - len(unique_chunks)} chunks. Remains: {len(unique_chunks)}")
+
+        return unique_chunks
 
     async def close(self):
         """Close all async resources"""
@@ -131,6 +149,7 @@ class RAGSystem:
             user_message: str,
             stage: str,
             source_id: str = None,
+            subject_type: str = None,
             top_k: int = 5,
             temperature: float = 0.3
     ) -> Dict:
@@ -181,16 +200,20 @@ class RAGSystem:
 
             logger.debug(f"Found {len(search_results)} relevant chunks")
 
+            # Step 2.5: Remove duplicates by ID before processing
+            search_results = self._remove_duplicates_by_id(search_results)
+
             # Step 3: Build context from chunks
             context = self._build_context_from_chunks(search_results)
 
             # Step 4: Build messages array with conversation history and current query
-            messages = self._build_conversation_messages(conversation_history, user_message, context, syllabus_content)
+            messages = self._build_conversation_messages(conversation_history, user_message, context, syllabus_content,
+                                                         subject_type)
 
             # Log the final prompt for debugging
             logger.info("=== Final prompt being sent to model ===")
             for i, message in enumerate(messages):
-                logger.info(f"Message {i+1} - Role: {message['role']}")
+                logger.info(f"Message {i + 1} - Role: {message['role']}")
                 logger.info(f"Content:\n{message['content']}")
                 logger.info("=" * 50)
 
@@ -272,7 +295,8 @@ Relevant context:
 
         return "\n\n".join(context_parts)
 
-    def _build_conversation_messages(self, conversation_history: List[Dict], user_message: str, context: str, syllabus_content: str = "") -> List[
+    def _build_conversation_messages(self, conversation_history: List[Dict], user_message: str, context: str,
+                                     syllabus_content: str = "", subject_type: str = None) -> List[
         Dict]:
         """
         Build messages array with proper conversation structure including system prompt,
@@ -280,10 +304,10 @@ Relevant context:
         """
         messages = []
 
-        # Add system message with syllabus context
+        # Add system message with syllabus context and subject type
         messages.append({
             "role": "system",
-            "content": self._get_system_prompt(syllabus_content)
+            "content": self._get_system_prompt(syllabus_content, subject_type)
         })
 
         # Add conversation history (all messages)
@@ -314,20 +338,44 @@ Relevant context:
 
         return messages
 
-    def _get_system_prompt(self, syllabus_content: str = "") -> str:
+    def _get_system_prompt(self, syllabus_content: str = "", subject_type: str = None) -> str:
         """
-        Define system behavior with optional syllabus context using injected prompt_loader
+        Define system behavior with optional syllabus context and subject type using injected prompt_loader
         """
-        if syllabus_content:
-            # Use the prompt with syllabus
-            return self.prompt_loader.get_prompt(
-                "free_chat",
-                "system - עם סילבוס",
-                syllabus_content=syllabus_content
-            )
+        # Determine the appropriate prompt section based on subject_type and syllabus availability
+        if subject_type:
+            if syllabus_content:
+                # Subject-specific prompt with syllabus
+                section = f"system - {subject_type} - עם סילבוס"
+            else:
+                # Subject-specific prompt without syllabus
+                section = f"system - {subject_type}"
         else:
-            # Use the basic prompt
-            return self.prompt_loader.get_prompt("free_chat", "system")
+            if syllabus_content:
+                # General prompt with syllabus
+                section = "system - כללי - עם סילבוס"
+            else:
+                # General prompt without syllabus
+                section = "system - כללי"
+
+        logger.info(f"Using prompt section: {section}")
+
+        prompt = self.prompt_loader.get_prompt(
+            "free_chat",
+            section,
+            syllabus_content=syllabus_content
+        )
+
+        # Log the final prompt for debugging
+        logger.info("=== SELECTED SYSTEM PROMPT ===")
+        logger.info(f"Section: {section}")
+        logger.info(f"Subject Type: {subject_type}")
+        logger.info(f"Has Syllabus: {'Yes' if syllabus_content else 'No'}")
+        logger.info("Prompt Content:")
+        logger.info(prompt)
+        logger.info("=" * 50)
+
+        return prompt
 
     def _extract_sources_info(self, chunks: List[Dict]) -> List[Dict]:
         """
