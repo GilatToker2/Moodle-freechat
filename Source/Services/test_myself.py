@@ -229,7 +229,7 @@ async def main():
         query="מה זה יחס שקילות?"
     )
 
-    print("=== Lecture Mode Test ===")
+    print("=== Lecture Mode Test  ===")
     print(f"Response: {result1['response']}")
     print(f"Sources: {len(result1['sources'])}")
 
