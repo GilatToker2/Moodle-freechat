@@ -156,7 +156,7 @@ class PromptLoader:
         # Map prompt types to file names - with aliases for backward compatibility
         prompt_files = {
             'free_chat': 'free_chat_prompt',
-            'test_myself': 'test_myself_prompt'
+            'test_myself': 'quiz_myself_prompt'
         }
 
         if prompt_type not in prompt_files:

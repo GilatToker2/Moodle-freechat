@@ -112,10 +112,10 @@ class AssistantHelper:
             conversation_context = self._build_conversation_context(conversation_history)
 
             # Get prompts using injected prompt_loader
-            system_prompt = self.prompt_loader.get_prompt("test_myself", "system")
+            system_prompt = self.prompt_loader.get_prompt("test_myself", "System")
             user_prompt = self.prompt_loader.get_prompt(
                 "test_myself",
-                "user",
+                "User",
                 conversation_context=conversation_context,
                 context=context,
                 query=query
@@ -199,17 +199,17 @@ class AssistantHelper:
         context_parts = []
         for i, result in enumerate(results, 1):
             text = result.get('text', '')
-            context_parts.append(f"מקור {i}: {text}")
+            context_parts.append(f"Source {i}: {text}")
         return "\n\n".join(context_parts)
 
     def _build_conversation_context(self, conversation_history):
         """Build conversation context from history"""
         if not conversation_history:
-            return "זוהי תחילת השיחה."
+            return "This is the beginning of the conversation."
 
-        context_parts = ["הקשר השיחה הקודמת:"]
+        context_parts = ["Previous conversation context:"]
         for msg in conversation_history[-5:]:  # Last 5 messages for context
-            role = "סטודנט" if msg.get('role') == 'user' else "מורה"
+            role = "Student" if msg.get('role') == 'user' else "Teacher"
             content = msg.get('content', '')
             context_parts.append(f"{role}: {content}")
 

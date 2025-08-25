@@ -150,6 +150,7 @@ class RAGSystem:
             stage: str,
             source_id: str = None,
             subject_type: str = None,
+            course_name: str = None,
             top_k: int = 5,
             temperature: float = 0.3
     ) -> Dict:
@@ -208,7 +209,7 @@ class RAGSystem:
 
             # Step 4: Build messages array with conversation history and current query
             messages = self._build_conversation_messages(conversation_history, user_message, context, syllabus_content,
-                                                         subject_type)
+                                                         subject_type, course_name)
 
             # Log the final prompt for debugging
             logger.info("=== Final prompt being sent to model ===")
@@ -296,7 +297,7 @@ Relevant context:
         return "\n\n".join(context_parts)
 
     def _build_conversation_messages(self, conversation_history: List[Dict], user_message: str, context: str,
-                                     syllabus_content: str = "", subject_type: str = None) -> List[
+                                     syllabus_content: str = "", subject_type: str = None, course_name: str = None) -> List[
         Dict]:
         """
         Build messages array with proper conversation structure including system prompt,
@@ -307,7 +308,7 @@ Relevant context:
         # Add system message with syllabus context and subject type
         messages.append({
             "role": "system",
-            "content": self._get_system_prompt(syllabus_content, subject_type)
+            "content": self._get_system_prompt(syllabus_content, subject_type, course_name)
         })
 
         # Add conversation history (all messages)
@@ -338,38 +339,65 @@ Relevant context:
 
         return messages
 
-    def _get_system_prompt(self, syllabus_content: str = "", subject_type: str = None) -> str:
+    def _get_system_prompt(self, syllabus_content: str = "", subject_type: str = None, course_name: str = None) -> str:
         """
         Define system behavior with optional syllabus context and subject type using injected prompt_loader
         """
-        # Determine the appropriate prompt section based on subject_type and syllabus availability
-        if subject_type:
+        # Determine the appropriate prompt section based on subject_type, syllabus availability, and course_name
+        if subject_type and subject_type in ["מתמטי", "Mathematics", "Mathematical"]:
             if syllabus_content:
-                # Subject-specific prompt with syllabus
-                section = f"system - {subject_type} - עם סילבוס"
+                # Mathematical subject with syllabus
+                if course_name:
+                    section = "System - Mathematics - Syllabus - course_name"
+                else:
+                    section = "System - Mathematics - Syllabus"
             else:
-                # Subject-specific prompt without syllabus
-                section = f"system - {subject_type}"
+                # Mathematical subject without syllabus
+                if course_name:
+                    section = "System - Mathematics - course_name"
+                else:
+                    section = "System - Mathematics"
+        elif subject_type and subject_type in ["הומני", "Humanities", "Humanistic"]:
+            if syllabus_content:
+                # Humanities subject with syllabus
+                if course_name:
+                    section = "System - Humanities - Syllabus - course_name"
+                else:
+                    section = "System - Humanities - Syllabus"
+            else:
+                # Humanities subject without syllabus
+                if course_name:
+                    section = "System - Humanities - course_name"
+                else:
+                    section = "System - Humanities"
         else:
             if syllabus_content:
                 # General prompt with syllabus
-                section = "system - כללי - עם סילבוס"
+                if course_name:
+                    section = "System - General - Syllabus - course_name"
+                else:
+                    section = "System - General - Syllabus"
             else:
                 # General prompt without syllabus
-                section = "system - כללי"
+                if course_name:
+                    section = "System - General - course_name"
+                else:
+                    section = "System - General"
 
         logger.info(f"Using prompt section: {section}")
 
         prompt = self.prompt_loader.get_prompt(
             "free_chat",
             section,
-            syllabus_content=syllabus_content
+            syllabus_content=syllabus_content,
+            course_name=course_name
         )
 
         # Log the final prompt for debugging
         logger.info("=== SELECTED SYSTEM PROMPT ===")
         logger.info(f"Section: {section}")
         logger.info(f"Subject Type: {subject_type}")
+        logger.info(f"Course Name: {course_name}")
         logger.info(f"Has Syllabus: {'Yes' if syllabus_content else 'No'}")
         logger.info("Prompt Content:")
         logger.info(prompt)

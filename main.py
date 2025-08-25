@@ -238,6 +238,7 @@ class FreeChatRequest(BaseModel):
     stage: str
     source_id: Optional[str] = None
     subject_type: Optional[str] = None
+    course_name: Optional[str] = None
 
 
 class FreeChatResponse(BaseModel):
@@ -346,7 +347,8 @@ async def free_chat_endpoint(request: FreeChatRequest):
           "course_id": "Discrete_mathematics",
           "user_message": "תן לי דוגמא לטבלת אמת",
           "stage": "regular_chat",
-          "subject_type": "מתמטי"
+          "subject_type": "Mathematics",
+          "course_name": "מתמטיקה בדידה"
         }
         ```
 
@@ -358,7 +360,8 @@ async def free_chat_endpoint(request: FreeChatRequest):
     - **user_message**: Current user question/message
     - **stage**: User stage (regular_chat/quiz_mode/presentation_discussion)
     - **source_id**: Optional - filter to specific source (video/document)
-    - **subject_type**: Optional - subject type ("מתמטי" for mathematical courses, "הומני" for humanities courses)
+    - **subject_type**: Optional - subject type ("Mathematics"/"מתמטי" for mathematical courses, "Humanities"/"הומני" for humanities courses)
+    - **course_name**: Optional - course name to include in the prompt for better context
 
     **Returns:**
     - All input fields preserved
@@ -390,7 +393,8 @@ async def free_chat_endpoint(request: FreeChatRequest):
             user_message=request.user_message,
             stage=request.stage,
             source_id=request.source_id,
-            subject_type=request.subject_type
+            subject_type=request.subject_type,
+            course_name=request.course_name
         )
 
         # Log result
